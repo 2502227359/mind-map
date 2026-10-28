@@ -8,6 +8,43 @@ import {
 import MindMapNode from '../core/render/node/MindMapNode'
 import { CONSTANTS } from '../constants/constant'
 
+const defaultSearchOptions = {
+  caseSensitive: false,
+  wholeWord: false,
+  regex: false
+}
+
+const searchText = (text, query, options = {}) => {
+  if (typeof text !== 'string' || typeof query !== 'string') return false
+  if (query === '') return true
+  const { caseSensitive = false, wholeWord = false, regex = false } = options
+  try {
+    const flags = caseSensitive ? '' : 'i'
+    if (regex) return new RegExp(query, flags).test(text)
+    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const pattern = wholeWord ? `\\b${escaped}\\b` : escaped
+    return new RegExp(pattern, flags).test(text)
+  } catch (error) {
+    return false
+  }
+}
+
+const replaceTextValue = (text, query, replacement, options = {}) => {
+  if (typeof text !== 'string' || typeof query !== 'string' || query === '') {
+    return text
+  }
+  const { caseSensitive = false, wholeWord = false, regex = false } = options
+  try {
+    const flags = (caseSensitive ? '' : 'i') + 'g'
+    if (regex) return text.replace(new RegExp(query, flags), replacement)
+    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const pattern = wholeWord ? `\\b${escaped}\\b` : escaped
+    return text.replace(new RegExp(pattern, flags), replacement)
+  } catch (error) {
+    return text
+  }
+}
+
 // 搜索插件
 class Search {
   //  构造函数
@@ -17,6 +54,8 @@ class Search {
     this.isSearching = false
     // 搜索文本
     this.searchText = ''
+    this.searchOptions = { ...defaultSearchOptions }
+    this.searchNode = null
     // 匹配的节点列表
     this.matchNodeList = []
     // 当前所在的节点列表索引
@@ -45,7 +84,12 @@ class Search {
   onDataChange() {
     if (this.isJumpNext) {
       this.isJumpNext = false
-      this.search(this.searchText)
+      this.search(
+        this.searchText,
+        undefined,
+        this.searchNode,
+        this.searchOptions
+      )
       return
     }
     if (this.notResetSearchText) {
@@ -69,20 +113,33 @@ class Search {
   }
 
   // 搜索
-  search(text, callback = () => {}) {
+  search(text, callback = () => {}, node = null, options = {}) {
     if (isUndef(text)) return this.endSearch()
     text = String(text)
+    options = { ...defaultSearchOptions, ...options }
     this.isSearching = true
-    if (this.searchText === text) {
+    if (this.checkIsChange(text, options, node)) {
       // 和上一次搜索文本一样，那么搜索下一个
       this.searchNext(callback)
     } else {
       // 和上次搜索文本不一样，那么重新开始
       this.searchText = text
-      this.doSearch()
+      this.searchOptions = options
+      this.searchNode = node
+      this.doSearch(node)
       this.searchNext(callback)
     }
     this.emitEvent()
+  }
+
+  checkIsChange(text, options, node) {
+    return (
+      this.searchText === text &&
+      this.searchNode === node &&
+      this.searchOptions.caseSensitive === options.caseSensitive &&
+      this.searchOptions.wholeWord === options.wholeWord &&
+      this.searchOptions.regex === options.regex
+    )
   }
 
   // 更新匹配节点列表
@@ -98,6 +155,8 @@ class Search {
       this.matchNodeList[this.currentIndex].closeHighlight()
     }
     this.searchText = ''
+    this.searchOptions = { ...defaultSearchOptions }
+    this.searchNode = null
     this.updateMatchNodeList([])
     this.currentIndex = -1
     this.notResetSearchText = false
@@ -106,32 +165,39 @@ class Search {
   }
 
   // 搜索匹配的节点
-  doSearch() {
+  doSearch(node = null) {
     this.clearHighlightOnReadonly()
     this.updateMatchNodeList([])
     this.currentIndex = -1
     const { isOnlySearchCurrentRenderNodes } = this.mindMap.opt
     // 如果要搜索收起来的节点，那么要遍历渲染树而不是节点树
-    const tree = isOnlySearchCurrentRenderNodes
-      ? this.mindMap.renderer.root
-      : this.mindMap.renderer.renderTree
-    if (!tree) return
+    let roots
+    if (isOnlySearchCurrentRenderNodes) {
+      roots = node ? [node] : [this.mindMap.renderer.root]
+    } else {
+      const root = node && node.nodeData ? node.nodeData : node
+      roots = root ? [root] : [this.mindMap.renderer.renderTree]
+    }
+    roots = roots.filter(Boolean)
+    if (roots.length <= 0) return
     const matchList = []
-    bfsWalk(tree, node => {
-      let { richText, text, generalization } = isOnlySearchCurrentRenderNodes
-        ? node.getData()
-        : node.data
-      if (richText) {
-        text = getTextFromHtml(text)
-      }
-      if (text.includes(this.searchText)) {
-        matchList.push(node)
-      }
-      // 概要节点
-      const generalizationList = formatGetNodeGeneralization({
-        generalization
-      })
-      generalizationList.forEach(gNode => {
+    roots.forEach(root => {
+      bfsWalk(root, currentNode => {
+        const data =
+          isOnlySearchCurrentRenderNodes &&
+          typeof currentNode.getData === 'function'
+            ? currentNode.getData()
+            : currentNode.data || currentNode
+        let { richText, text, generalization } = data
+        if (richText) text = getTextFromHtml(text)
+        if (searchText(text, this.searchText, this.searchOptions)) {
+          matchList.push(currentNode)
+        }
+        // 概要节点
+        const generalizationList = formatGetNodeGeneralization({
+          generalization
+        })
+        generalizationList.forEach(gNode => {
         let { richText, text, uid } = gNode
         if (
           isOnlySearchCurrentRenderNodes &&
@@ -142,11 +208,12 @@ class Search {
         if (richText) {
           text = getTextFromHtml(text)
         }
-        if (text.includes(this.searchText)) {
+        if (searchText(text, this.searchText, this.searchOptions)) {
           matchList.push({
             data: gNode
           })
         }
+        })
       })
     })
     this.updateMatchNodeList(matchList)
@@ -236,7 +303,7 @@ class Search {
     let currentNode = this.matchNodeList[this.currentIndex]
     if (!currentNode) return
     // 如果当前搜索文本是替换文本的子串，那么该节点还是符合搜索结果的
-    const keep = replaceText.includes(this.searchText)
+    const keep = searchText(replaceText, this.searchText, this.searchOptions)
     const text = this.getReplacedText(currentNode, this.searchText, replaceText)
     this.notResetSearchText = true
     currentNode.setText(text, currentNode.getData('richText'))
@@ -267,7 +334,7 @@ class Search {
       return
     replaceText = String(replaceText)
     // 如果当前搜索文本是替换文本的子串，那么该节点还是符合搜索结果的
-    const keep = replaceText.includes(this.searchText)
+    const keep = searchText(replaceText, this.searchText, this.searchOptions)
     this.notResetSearchText = true
     this.matchNodeList.forEach(node => {
       const text = this.getReplacedText(node, this.searchText, replaceText)
@@ -297,7 +364,7 @@ class Search {
     if (richText) {
       return replaceHtmlText(text, searchText, replaceText)
     } else {
-      return text.replace(new RegExp(searchText, 'g'), replaceText)
+      return replaceTextValue(text, searchText, replaceText, this.searchOptions)
     }
   }
 

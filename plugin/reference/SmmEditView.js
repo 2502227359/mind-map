@@ -31,6 +31,7 @@ import { parseDocument } from '../src/document/format.js'
 import { SaveCoordinator, SaveConflictError } from '../src/document/save.js'
 import { AssetStore } from '../src/assets.js'
 import ModifyFileName from './ob/ModifyFileName.js'
+import { createEditorApi } from '../src/editor-api.js'
 
 function decodeSvgDataUrl(value) {
   const source = String(value || '')
@@ -274,7 +275,11 @@ class SmmEditView extends TextFileView {
       initLocationNodeId = fileToSubpathMap[filePath]
       delete fileToSubpathMap[filePath]
     }
-    this.mindMapAPP = initApp(el, {
+    this.mindMapAPP = initApp(el, createEditorApi({
+      app: this.app, plugin: this.plugin, getFile: () => this.file,
+      assetStore: this.assetStore,
+      saveFileToVault: (...args) => this.saveFileToVault(...args),
+      documentApi: {
       isActive: () => this.app.workspace.activeLeaf?.view === this && !this.closePromise,
       getInitMindMapData: () => {
         return this.parsedMindMapData.metadata.content
@@ -329,137 +334,12 @@ class SmmEditView extends TextFileView {
           throw error
         }
       },
-      getMindMapConfig: () => {
-        return this.plugin.settings.mindMapConfig || {}
-      },
-      saveMindMapConfig: newConfig => {
-        this.plugin.settings.mindMapConfig = newConfig
-        this.plugin._saveSettings()
-      },
-      getMindMapLocalConfig: () => {
-        const { mindMapLocalConfig, themeMode } = this.plugin.settings
-        const config = mindMapLocalConfig || {}
-        config.isDark =
-          themeMode === 'follow'
-            ? this.plugin._getObIsDark()
-            : themeMode === 'dark'
-        return config
-      },
-      saveMindMapLocalConfig: newConfig => {
-        this.plugin.settings.mindMapLocalConfig = newConfig
-        this.plugin._saveSettings()
-      },
-      getSettings: () => {
-        return this.plugin.settings || {}
-      },
-      updateSettings: data => {
-        this.plugin.settings = {
-          ...this.plugin.settings,
-          ...data
-        }
-        this.plugin._saveSettings()
-      },
-      getObAllFiles: (extraSelf = true) => {
-        const fileList = this.app.vault.getFiles()
-        if (extraSelf && this.file) {
-          return fileList.filter(item => {
-            return item.path !== this.file.path
-          })
-        }
-        return fileList
-      },
-      createLinkInfoFromFilePath: (filePath, subpath = '', alias = '') => {
-        const file = this.tryGetFileByPath(filePath)
-        if (!file) {
-          return null
-        }
-        const linkText = this.app.fileManager.generateMarkdownLink(
-          file,
-          this.file?.path || '',
-          subpath,
-          alias
-        )
-        return {
-          link: file.path,
-          linkText
-        }
-      },
-      openFile: (filePath, isNewTab = false, createOnNoExist = false) => {
-        if (!filePath) return
-        const arr = filePath.split(/(#|^|\|)/)
-        filePath = arr[0]
-        let postfix = ''
-        if (arr.length > 1 && arr[1] !== '|') {
-          postfix = arr.slice(1).join('')
-        }
-        const file = this.tryGetFileByPath(filePath)
-        if (file && file instanceof TFile) {
-          this.app.workspace.openLinkText(
-            file.path + postfix,
-            this.file?.path || '',
-            isNewTab
-          )
-        } else if (createOnNoExist) {
-          this.app.workspace.openLinkText(
-            /\.md$/.test(filePath) ? filePath : filePath + '.md',
-            this.file?.path || '',
-            isNewTab
-          )
-        }
-      },
-      openWebLink: url => {
-        if (this.app.openExternal) {
-          this.app.openExternal(url)
-          return
-        }
-        try {
-          if (window.require) {
-            const { shell } = window.require('electron')
-            shell.openExternal(url)
-            return
-          }
-        } catch (e) {}
-        window.open(url, '_blank', 'noopener,noreferrer')
-      },
-      saveFileToVault: async (...args) => {
-        const res = await this.saveFileToVault(...args)
-        return res
-      },
-      getResourcePath: vaultPath => {
-        return this.assetStore.getResourcePath(vaultPath, this.file?.path || '')
-      },
-      getObInternalLink: (...args) => {
-        return this.app.fileManager.generateMarkdownLink(this.file, '', ...args)
-      },
-      showTip: tip => {
-        new Notice(tip)
-      },
-      getFileFromUri: uri => {
-        const params = new URLSearchParams(uri.split('?')[1])
-        const vault = decodeURIComponent(params.get('vault') || '')
-        const filePath = decodeURIComponent(params.get('file') || '')
-        if (!vault || !filePath) return null
-        if (this.app.vault.getName() !== vault) {
-          new Notice(this.plugin._t('tip.onlyEnableSelectCurrentVaultFile'))
-          return null
-        }
-        return this.tryGetFileByPath(filePath)
-      },
-      isMobile: () => {
-        return Platform.isMobile
-      },
-      getObsidianApp: () => {
-        return this.app
-      },
-      getFormatFileName: (str, ignores = []) => {
-        return formatFileName(str, {
-          notename: this.file?.basename.split('.')[0],
-          ignores
-        })
+
       }
-    })
-    setTimeout(() => {
-      this._listenMindMapEvent()
+    }))
+    this.initializeTimer = setTimeout(() => {
+      this.initializeTimer = null
+      if (this.mindMapAPP) this._listenMindMapEvent()
     }, 100)
   }
 
@@ -632,6 +512,9 @@ class SmmEditView extends TextFileView {
     const current = this.saveCoordinator
     if (raw === current.currentRaw || raw === current.baseRaw) {
       current.acceptExternal(raw)
+      this.invalidError = null
+      this.isOuterChange = current.state === 'conflict'
+      this._setIsUnSave(current.dirty || this.isOuterChange)
       return
     }
     if (this.mindMapAPP) {
@@ -676,6 +559,8 @@ class SmmEditView extends TextFileView {
   }
 
   clear() {
+    clearTimeout(this.initializeTimer)
+    this.initializeTimer = null
     this._clearObserver()
     if (this.mindMapAPP) {
       try {

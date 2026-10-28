@@ -41,7 +41,7 @@
             <el-checkbox
               v-model="transformFormula"
               style="margin-bottom: 5px;margin-top: 6px;"
-              >转换数学公式</el-checkbox
+              >转换数学公式（XMind、Markdown、TXT）</el-checkbox
             >
           </div>
           <div class="tip">
@@ -98,12 +98,14 @@
 import xmind from 'simple-mind-map/src/parse/xmind.js'
 import markdown from 'simple-mind-map/src/parse/markdown.js'
 import txt from '@/utils/txt'
+import { parseOpml } from 'simple-mind-map/src/parse/opml.js'
 import { mapMutations } from 'vuex'
 import { base64ToFile, tFileToFile } from '@/utils'
 import { getDataFromDt } from '@/components/ImgUpload/utils'
 
 const mimeTypes = {
   md: 'text/markdown',
+  opml: 'text/xml',
   json: 'application/json',
   xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 }
@@ -122,7 +124,7 @@ export default {
   },
   computed: {
     supportFileStr() {
-      return '.smm,.json,.xmind,.md,.txt'
+      return '.smm,.json,.xmind,.md,.txt,.opml'
     }
   },
   watch: {
@@ -148,7 +150,7 @@ export default {
     },
 
     getRegexp() {
-      return new RegExp(`\.(smm|json|xmind|md|txt)$`)
+      return /\.(smm|json|xmind|md|txt|opml)$/i
     },
 
     async onDrop(e) {
@@ -205,17 +207,33 @@ export default {
       }
       this.$root.$bus.$emit('showLoading')
       let file = this.fileList[0]
-      if (/\.(smm|json)$/.test(file.name)) {
+      if (/\.(smm|json)$/i.test(file.name)) {
         this.handleSmm(file)
-      } else if (/\.xmind$/.test(file.name)) {
+      } else if (/\.xmind$/i.test(file.name)) {
         this.handleXmind(file)
-      } else if (/\.md$/.test(file.name)) {
+      } else if (/\.md$/i.test(file.name)) {
         this.handleMd(file)
-      } else if (/\.txt$/.test(file.name)) {
+      } else if (/\.txt$/i.test(file.name)) {
         this.handleTxt(file)
+      } else if (/\.opml$/i.test(file.name)) {
+        this.handleOpml(file)
       }
       this.cancel()
       this.setActiveSidebar(null)
+    },
+
+    async handleOpml(file) {
+      try {
+        const data = parseOpml(await file.raw.text())
+        this.$root.$bus.$emit('setData', data)
+        this.$root.$obsidianAPI.showTip(this.$t('import.importSuccess'))
+      } catch (error) {
+        this.$root.$obsidianAPI.showTip(
+          `${this.$t('import.fileParsingFailed')}：${error.message || error}`
+        )
+      } finally {
+        this.$root.$bus.$emit('hideLoading')
+      }
     },
 
     handleSmm(file) {

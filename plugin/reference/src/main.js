@@ -66,9 +66,11 @@ Vue.prototype.$confirm = MessageBox.confirm
 
 export const initApp = (el, obsidianAPI = {}) => {
   const i18n = createI18n(obsidianAPI.getSettings().lang || 'en')
+  const store = createStore()
+  store.commit('setIsReadonly', Boolean(obsidianAPI.getIsReadonlyMode?.()))
   const app = new Vue({
     render: h => h(App),
-    store: createStore(),
+    store,
     i18n
   })
   const bus = new Vue()

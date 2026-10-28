@@ -26,6 +26,13 @@
           </div>
           <div
             class="item"
+            @click="exec('INSERT_NODE_UP', insertNodeBtnDisabled)"
+            :class="{ disabled: insertNodeBtnDisabled }"
+          >
+            <span class="name">{{ $t('contextmenu.insertSiblingNodeAbove') }}</span>
+          </div>
+          <div
+            class="item"
             @click="exec('INSERT_CHILD_NODE')"
             :class="{ disabled: isGeneralization }"
           >
@@ -163,7 +170,10 @@
           </div>
         </div>
       </div>
-      <div class="item" @click="exec('COPY_NODE_TO_OB_LINK')">
+      <div class="item" @click="searchOnNode">
+        <span class="name">{{ $t('contextmenu.searchInNode') }}</span>
+      </div>
+      <div class="item" @click="exec('COPY_NODE_TO_OB_LINK')" v-if="!isCodeBlock">
         <span class="name">{{ $t('contextmenu.copyAsInternalUrl') }}</span>
       </div>
     </template>
@@ -224,6 +234,15 @@
       <div class="item" @click="exec('TOGGLE_ZEN_MODE')">
         <span class="name">{{ $t('contextmenu.zenMode') }}</span>
         <span class="el-icon-check" v-if="isZenMode"></span>
+      </div>
+      <div class="item" v-if="canToggleLines" @click="toggleLines">
+        <span class="name">{{
+          $t(
+            linesHidden
+              ? 'contextmenu.showAssociativeLines'
+              : 'contextmenu.hideAssociativeLines'
+          )
+        }}</span>
       </div>
       <div class="splitLine"></div>
       <div
@@ -303,6 +322,7 @@ export default {
       numberLevel: '',
       subItemsShowLeft: false,
       isNodeMousedown: false,
+      linesHidden: false,
       listBoxWidth: '250px'
     }
   },
@@ -386,6 +406,15 @@ export default {
     },
     hasCustomTextWidth() {
       return this.node.hasCustomWidth()
+    },
+    isCodeBlock() {
+      return Boolean(this.$root.$obsidianAPI?.getIsCodeBlock?.())
+    },
+    canToggleLines() {
+      return Boolean(
+        this.mindMap.associativeLine &&
+          typeof this.mindMap.associativeLine.setLinesVisibility === 'function'
+      )
     },
     styleObj() {
       const res = {
@@ -595,6 +624,19 @@ export default {
           this.$root.$bus.$emit('execCommand', key, ...args)
           break
       }
+      this.hide()
+    },
+
+    searchOnNode() {
+      if (!this.node) return
+      this.$root.$bus.$emit('show_search', this.node)
+      this.hide()
+    },
+
+    toggleLines() {
+      if (!this.canToggleLines) return
+      this.linesHidden = !this.linesHidden
+      this.mindMap.associativeLine.setLinesVisibility(!this.linesHidden)
       this.hide()
     },
 

@@ -2,7 +2,8 @@ import { Text, Rect, G } from '@svgdotjs/svg.js'
 import {
   getStrWithBrFromHtml,
   focusInput,
-  selectAllInput
+  selectAllInput,
+  transformInnerElsPosition
 } from '../../utils/index'
 
 const OUTER_FRAME_TEXT_EDIT_WRAP = 'outer-frame-text-edit-warp'
@@ -39,7 +40,9 @@ function showEditTextBox(g) {
     this.textEditNode = document.createElement('div')
     this.textEditNode.className = OUTER_FRAME_TEXT_EDIT_WRAP
     this.textEditNode.style.cssText = `
-      position: fixed;
+      position: ${
+        this.mindMap.opt.customInnerElsAppendTo ? 'absolute' : 'fixed'
+      };
       box-sizing: border-box;
       background-color: #fff;
       box-shadow: 0 0 20px rgba(0,0,0,.5);
@@ -112,8 +115,13 @@ function updateTextEditBoxPos(g) {
   if (this.textEditNode) {
     this.textEditNode.style.minWidth = `${rect.width}px`
     this.textEditNode.style.minHeight = `${rect.height}px`
-    this.textEditNode.style.left = `${rect.left}px`
-    this.textEditNode.style.top = `${rect.top}px`
+    const position = transformInnerElsPosition(
+      this.mindMap,
+      rect.left,
+      rect.top
+    )
+    this.textEditNode.style.left = `${position.left}px`
+    this.textEditNode.style.top = `${position.top}px`
   }
 }
 

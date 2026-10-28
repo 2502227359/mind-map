@@ -577,6 +577,24 @@ export const downTypeList = [
     type: 'json',
     icon: 'iconjson',
     desc: 'Popular data exchange format that can be used for re importing'
+  },
+  {
+    name: 'HTML (static)',
+    type: 'html',
+    icon: 'icondaimakuai',
+    desc: 'Offline static preview with embedded images; editing is not included'
+  },
+  {
+    name: 'Mermaid',
+    type: 'mmd',
+    icon: 'iconMermaid',
+    desc: 'Node hierarchy and text; map styles and images are not included'
+  },
+  {
+    name: 'OPML',
+    type: 'opml',
+    icon: 'icongaiyao',
+    desc: 'Outline hierarchy, text, links and notes; map styles and images are not included'
   }
 ]
 
@@ -668,12 +686,14 @@ export const layoutGroupList = [
     list: [
       'timeline',
       'timeline2',
-      'verticalTimeline'
+      'verticalTimeline',
+      'verticalTimeline2',
+      'verticalTimeline3'
     ]
   },
   {
     name: 'Fishbone',
-    list: ['fishbone']
+    list: ['fishbone', 'fishbone2']
   }
 ]
 
@@ -689,6 +709,7 @@ export const iconNameMap = {
   summary: 'Insert summary',
   associativeLine: 'Add connector line',
   formula: 'Insert math formula',
+  attachment: 'Add attachment',
   outerFrame: 'Add border frame',
   ai: 'AI generate'
 }

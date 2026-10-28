@@ -1,19 +1,32 @@
 import { PluginSettingTab, Setting, Notice, normalizePath } from 'obsidian'
 import themeList from 'simple-mind-map-plugin-themes/themeList'
-import { layoutGroupList } from '../src/config'
+import { fontFamilyList, langList, layoutGroupList } from '../src/config'
 import { GITHUB_ICON, COMMUNITY_ICON } from './constant'
-import { DEFAULT_SETTINGS } from './constant'
+import {
+  DEFAULT_SETTINGS,
+  CODE_BLOCK_MAX_HEIGHT,
+  CODE_BLOCK_MIN_HEIGHT,
+  normalizeCodeBlockHeight,
+  normalizePositiveInteger,
+  SMM_VIEW_TYPE
+} from './constant'
 import { SuggestionModal } from './SuggestionModal'
 import { TextInfoDialog } from './TextInfoDialog'
+import FontManager from './FontManager.js'
+import { getFontOptions } from '../../src/fonts.js'
 
 const validateInteger = (value, defaultValue = 0, errorTip) => {
-  value = Number(value)
-  if (!Number.isNaN(value) && value > 0) {
-    return value
-  } else {
-    new Notice(errorTip)
-    return defaultValue
-  }
+  const normalized = normalizePositiveInteger(value, null)
+  if (normalized !== null) return normalized
+  new Notice(errorTip)
+  return defaultValue
+}
+
+const validateCodeBlockHeight = (value, defaultValue, errorTip) => {
+  const normalized = normalizeCodeBlockHeight(value, null)
+  if (normalized !== null) return normalized
+  new Notice(errorTip)
+  return defaultValue
 }
 
 export default class SmmSettingTab extends PluginSettingTab {
@@ -29,6 +42,9 @@ export default class SmmSettingTab extends PluginSettingTab {
     this.compressImageOptionsMaxHeightSettings = null
     this.compressImageOptionsQualitySettings = null
     this.embedImageIsSeparateFileFolderSettings = null
+    this.templatePathSettings = null
+    this.templatePathInput = null
+    this.languageDropdown = null
   }
 
   display() {
@@ -73,6 +89,69 @@ export default class SmmSettingTab extends PluginSettingTab {
               this.plugin._t('tip.integerInputError')
             )
             this.plugin.settings.autoSaveTime = value
+            await this.plugin._saveSettings()
+          })
+      })
+
+    new Setting(containerEl)
+      .setName('代码块初始高度')
+      .setDesc(
+        `代码块预览初始高度（${CODE_BLOCK_MIN_HEIGHT}-${CODE_BLOCK_MAX_HEIGHT}px），重新渲染代码块后生效`
+      )
+      .addText(text => {
+        text.inputEl.type = 'number'
+        text.inputEl.min = String(CODE_BLOCK_MIN_HEIGHT)
+        text.inputEl.max = String(CODE_BLOCK_MAX_HEIGHT)
+        text
+          .setValue(String(this.plugin.settings.codeBlockInitHeight))
+          .onChange(async value => {
+            this.plugin.settings.codeBlockInitHeight = validateCodeBlockHeight(
+              value,
+              DEFAULT_SETTINGS.codeBlockInitHeight,
+              `请输入 ${CODE_BLOCK_MIN_HEIGHT}-${CODE_BLOCK_MAX_HEIGHT} 之间的整数`
+            )
+            text.setValue(String(this.plugin.settings.codeBlockInitHeight))
+            await this.plugin._saveSettings()
+          })
+      })
+
+    new Setting(containerEl)
+      .setName('代码块预览透明背景')
+      .setDesc('仅影响代码块只读预览；重新渲染代码块后生效')
+      .addToggle(toggle => {
+        toggle
+          .setValue(this.plugin.settings.codeBlockBgIsTransparent === true)
+          .onChange(async value => {
+            this.plugin.settings.codeBlockBgIsTransparent = value
+            await this.plugin._saveSettings()
+          })
+      })
+
+    new Setting(containerEl)
+      .setName('语言跟随 Obsidian')
+      .setDesc('开启后使用 Obsidian 当前语言；关闭后使用下面的手动语言')
+      .addToggle(toggle => {
+        toggle
+          .setValue(this.plugin.settings.langFollowOb !== false)
+          .onChange(async value => {
+            this.plugin.settings.langFollowOb = value
+            this.plugin._applyLanguageSetting()
+            this.languageDropdown?.setDisabled(value)
+            await this.plugin._saveSettings()
+          })
+      })
+
+    new Setting(containerEl)
+      .setName('手动语言')
+      .setDesc('仅在关闭“语言跟随 Obsidian”时生效；重新打开导图后应用编辑器语言')
+      .addDropdown(dropdown => {
+        this.languageDropdown = dropdown
+        langList.forEach(item => dropdown.addOption(item.value, item.name))
+        dropdown
+          .setValue(this.plugin.settings.lang)
+          .setDisabled(this.plugin.settings.langFollowOb !== false)
+          .onChange(async value => {
+            this.plugin.settings.lang = value
             await this.plugin._saveSettings()
           })
       })
@@ -168,6 +247,63 @@ export default class SmmSettingTab extends PluginSettingTab {
             this.plugin.settings.defaultLayout = value
             await this.plugin._saveSettings()
           })
+      })
+
+    const localeFonts =
+      fontFamilyList[this.plugin.settings.lang] || fontFamilyList.en
+    const fontOptions = getFontOptions(
+      localeFonts,
+      this.plugin.settings.addedFonts
+    )
+    if (
+      this.plugin.settings.defaultNodeFont &&
+      !fontOptions.some(item => item.value === this.plugin.settings.defaultNodeFont)
+    ) {
+      fontOptions.push({
+        name: this.plugin.settings.defaultNodeFont,
+        value: this.plugin.settings.defaultNodeFont
+      })
+    }
+    fontOptions.unshift({ name: '跟随主题', value: '' })
+    new Setting(containerEl)
+      .setName('新建导图默认字体')
+      .setDesc('仅影响之后新建的导图，不会批量修改已有节点')
+      .addDropdown(dropdown => {
+        fontOptions.forEach(item => dropdown.addOption(item.value, item.name))
+        dropdown
+          .setValue(this.plugin.settings.defaultNodeFont || '')
+          .onChange(async value => {
+            this.plugin.settings.defaultNodeFont = value
+            await this.plugin._saveSettings()
+          })
+      })
+      .addButton(button => {
+        button.setButtonText('应用到当前导图').onClick(() => {
+          this._emitMindMapEvent('apply_default_font_to_map')
+        })
+      })
+
+    new Setting(containerEl)
+      .setName('公式渲染输出')
+      .setDesc('选择数学公式使用 MathML 或 HTML 输出；重新打开导图后生效')
+      .addDropdown(dropdown => {
+        dropdown.addOption('mathml', 'MathML')
+        dropdown.addOption('html', 'HTML')
+        dropdown
+          .setValue(this.plugin.settings.formulaRenderMode || 'mathml')
+          .onChange(async value => {
+            this.plugin.settings.formulaRenderMode = value
+            await this.plugin._saveSettings()
+          })
+      })
+
+    new Setting(containerEl)
+      .setName(this.plugin._t('setting.font.title'))
+      .setDesc(this.plugin._t('setting.font.desc'))
+      .addButton(button => {
+        button
+          .setButtonText(this.plugin._t('setting.font.btn'))
+          .onClick(() => new FontManager(this.app, this.plugin).open())
       })
   }
 
@@ -392,6 +528,17 @@ export default class SmmSettingTab extends PluginSettingTab {
             await this.plugin._saveSettings()
           })
       })
+
+    this.templatePathSettings = new Setting(containerEl)
+      .setName('新建导图模板')
+      .setDesc('可填写或选择 .smm.md 模板文件，也可以选择包含模板文件的目录')
+      .addText(text => {
+        this.templatePathInput = text
+        text
+          .setValue(this.plugin.settings.templatePath || '')
+          .onChange(value => this._setTemplatePath(text, value))
+        this._addTemplateSelectBtns(text)
+      })
   }
 
   _addCompressSetting() {
@@ -587,6 +734,86 @@ export default class SmmSettingTab extends PluginSettingTab {
         }
       }).open()
     })
+  }
+
+  _addTemplateSelectBtns(text) {
+    this._addFolderSelectBtn(text, selected => {
+      void this._setTemplatePath(text, selected)
+    })
+
+    const inputEl = text.inputEl
+    const fileButton = inputEl.parentElement?.createEl('button', {
+      text: '选择模板文件',
+      cls: 'suggestion-button'
+    })
+    fileButton?.addEventListener('click', () => {
+      new SuggestionModal({
+        plugin: this.plugin,
+        type: 'file',
+        app: this.app,
+        getSuggestions: query => {
+          const target = String(query || '').toLowerCase()
+          return this.app.vault
+            .getMarkdownFiles()
+            .filter(file =>
+              file.path.toLowerCase().includes(target) &&
+              /\.smm\.md$/i.test(file.path)
+            )
+            .map(file => file.path)
+        },
+        onSelect: selected => {
+          void this._setTemplatePath(text, selected)
+        }
+      }).open()
+    })
+  }
+
+  async _setTemplatePath(text, value) {
+    const previous = this.plugin.settings.templatePath || ''
+    const selected = normalizePath(String(value || '').trim())
+    try {
+      await this.plugin._validateTemplatePath(selected)
+      this.plugin.settings.templatePath = selected
+      text.setValue(selected)
+      await this.plugin._saveSettings()
+    } catch (error) {
+      text.setValue(previous)
+      new Notice(`模板不可用：${error.message || error}`)
+    }
+  }
+
+  _emitMindMapEvent(event, payload) {
+    if (event === 'apply_default_font_to_map') {
+      const activeView = this.plugin._getActiveSmmView?.()
+      if (activeView?.mindMapAPP?.$bus) {
+        activeView.mindMapAPP.$bus.$emit(event, payload)
+        return
+      }
+      const editors = this.plugin._codeBlockEditors instanceof Set
+        ? [...this.plugin._codeBlockEditors]
+        : []
+      const editableEditors = editors.filter(editor => {
+        return editor?.$obsidianAPI?.getIsReadonlyMode?.() === false
+      })
+      const modalEditor = editableEditors.find(editor => {
+        const element = editor?.$el
+        return element?.isConnected &&
+          element.closest?.('.personal-mindmap-block-modal')
+      })
+      const target =
+        modalEditor || editableEditors[editableEditors.length - 1]
+      target?.$bus?.$emit(event, payload)
+      return
+    }
+    const leaves = this.app.workspace.getLeavesOfType(SMM_VIEW_TYPE)
+    leaves.forEach(leaf => {
+      leaf.view?.mindMapAPP?.$bus?.$emit(event, payload)
+    })
+    if (this.plugin._codeBlockEditors instanceof Set) {
+      this.plugin._codeBlockEditors.forEach(editor => {
+        editor?.$bus?.$emit(event, payload)
+      })
+    }
   }
 
   _getFilePathOptions(full = false) {

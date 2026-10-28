@@ -1043,12 +1043,22 @@ export default {
     },
 
     initStyle() {
-      Object.keys(this.style).forEach(key => {
-        this.style[key] = this.mindMap.getThemeConfig(key)
-        if (key === 'backgroundImage' && this.style[key] === 'none') {
-          this.style[key] = ''
-        }
-      })
+      Object.keys(this.style)
+        .filter(key => !['lineRainbow', 'lineRainbowColorsList'].includes(key))
+        .forEach(key => {
+          this.style[key] = this.mindMap.getThemeConfig(key)
+          if (key === 'backgroundImage' && this.style[key] === 'none') {
+            this.style[key] = ''
+          }
+        })
+      const rainbowLinesConfig =
+        this.mindMap.getConfig('rainbowLinesConfig') || {}
+      this.style.lineRainbow = !!rainbowLinesConfig.open
+      this.style.lineRainbowColorsList = Array.isArray(
+        rainbowLinesConfig.colorsList
+      )
+        ? [...rainbowLinesConfig.colorsList]
+        : []
       this.initMarginStyle()
     },
 
@@ -1088,18 +1098,19 @@ export default {
 
     updateRainbowLinesConfig(item) {
       this.rainbowLinesPopoverVisible = false
-      if (item.list) {
-        this.style.lineRainbow = true
-        this.style.lineRainbowColorsList = item.list
-        this.data.theme.config.lineRainbow = true
-        this.data.theme.config.lineRainbowColorsList = item.list
-      } else {
-        this.style.lineRainbow = false
-        this.data.theme.config.lineRainbow = false
+      const rainbowLinesConfig = {
+        open: !!item.list,
+        colorsList: Array.isArray(item.list) ? [...item.list] : []
+      }
+      this.style.lineRainbow = rainbowLinesConfig.open
+      this.style.lineRainbowColorsList = rainbowLinesConfig.colorsList
+      this.data.theme.config = {
+        ...this.mindMap.getCustomThemeConfig(),
+        rainbowLinesConfig
       }
       this.$root.$bus.$emit('showLoading')
       this.mindMap.setThemeConfig(this.data.theme.config)
-      this.mindMap.rainbowLines.updateRainLinesRender()
+      this.mindMap.rainbowLines.updateRainLinesConfig(rainbowLinesConfig)
       this.$root.$bus.$emit('storeData', {
         theme: {
           template: this.mindMap.getTheme(),
@@ -1134,24 +1145,34 @@ export default {
     },
 
     getOutputConfig() {
+      const config = { ...(this.configData || {}) }
+      delete config.rainbowLinesConfig
       return {
         themeStyle: this.style || {},
-        config: this.configData || {}
+        config
       }
     },
 
     setConfig({ themeStyle, config }) {
-      Object.keys(themeStyle).forEach(key => {
-        if (['marginX', 'marginY'].includes(key)) {
-          this.updateMargin(key, themeStyle[key])
-        } else {
-          this.update(key, themeStyle[key])
-        }
-      })
-      if (this.style.lineRainbow) {
-        this.mindMap.rainbowLines.updateRainLinesRender()
+      Object.keys(themeStyle || {})
+        .filter(
+          key => !['lineRainbow', 'lineRainbowColorsList'].includes(key)
+        )
+        .forEach(key => {
+          if (['marginX', 'marginY'].includes(key)) {
+            this.updateMargin(key, themeStyle[key])
+          } else {
+            this.update(key, themeStyle[key])
+          }
+        })
+      if (themeStyle && 'lineRainbow' in themeStyle) {
+        this.updateRainbowLinesConfig({
+          list: themeStyle.lineRainbow
+            ? themeStyle.lineRainbowColorsList
+            : null
+        })
       }
-      Object.keys(config).forEach(key => {
+      Object.keys(config || {}).forEach(key => {
         if (['outerFramePaddingX', 'outerFramePaddingY'].includes(key)) {
           this.updateOuterFramePadding(key, config[key])
         }

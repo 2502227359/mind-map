@@ -113,6 +113,7 @@ export default {
   contextmenu: {
     insertNode: 'Insert node',
     insertSiblingNode: 'Sibling node',
+    insertSiblingNodeAbove: 'Insert sibling node above',
     insertChildNode: 'Child node',
     insertParentNode: 'Parent node',
     insertSummary: 'Summary',
@@ -162,6 +163,9 @@ export default {
     nodeAlgin: 'One click same level node alignment',
     removeCustomWidth: 'Remove custom width',
     copyAsInternalUrl: 'Copy as internal url',
+    searchInNode: 'Search in this node',
+    showAssociativeLines: 'Show associative lines',
+    hideAssociativeLines: 'Hide associative lines',
     removeAllCustomWidth: 'One click removal of custom width for all nodes',
     download: 'Download to local',
     copyNodeToTxt: 'Copy as plain text'
@@ -490,6 +494,7 @@ export default {
     color: 'Color',
     backgroundColor: 'Background color',
     removeFormat: 'Clear style',
+    fontSearchPlaceholder: 'Search fonts',
     textAlign: 'Text align'
   },
   other: {
@@ -509,6 +514,10 @@ export default {
   attachment: {
     deleteAttachment: 'Delete attachment',
     tip: 'The attachment function is only available on the client side'
+  },
+  nodeTagFilter: {
+    title: 'Nodes with the same tag',
+    empty: 'No other node uses this tag'
   },
   nodeOuterFrame: {
     outerFrameSetting: 'Outer frame setting',

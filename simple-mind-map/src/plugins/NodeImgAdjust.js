@@ -1,5 +1,8 @@
 // 节点图片大小调整插件
-import { resizeImgSizeByOriginRatio } from '../utils/index'
+import {
+  resizeImgSizeByOriginRatio,
+  transformInnerElsPosition
+} from '../utils/index'
 import btnsSvg from '../svg/btns'
 
 class NodeImgAdjust {
@@ -118,8 +121,9 @@ class NodeImgAdjust {
   // 设置自定义元素尺寸位置信息
   setHandleElRect() {
     let { width, height, x, y } = this.rect
-    this.handleEl.style.left = `${x}px`
-    this.handleEl.style.top = `${y}px`
+    const position = transformInnerElsPosition(this.mindMap, x, y)
+    this.handleEl.style.left = `${position.left}px`
+    this.handleEl.style.top = `${position.top}px`
     this.currentImgWidth = width
     this.currentImgHeight = height
     this.updateHandleElSize()
@@ -136,13 +140,16 @@ class NodeImgAdjust {
     const {
       imgResizeBtnSize,
       customResizeBtnInnerHTML,
-      customDeleteBtnInnerHTML
+      customDeleteBtnInnerHTML,
+      customInnerElsAppendTo
     } = this.mindMap.opt
     // 容器元素
     this.handleEl = document.createElement('div')
     this.handleEl.style.cssText = `
       pointer-events: none;
-      position: fixed;
+      position: ${
+        customInnerElsAppendTo ? 'absolute' : 'fixed'
+      };
 	    display:none;
       background-size: cover;
     `

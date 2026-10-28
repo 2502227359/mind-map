@@ -20,20 +20,22 @@ class TouchEvent {
     this.onTouchmove = this.onTouchmove.bind(this)
     this.onTouchcancel = this.onTouchcancel.bind(this)
     this.onTouchend = this.onTouchend.bind(this)
-    window.addEventListener('touchstart', this.onTouchstart, { passive: false })
-    window.addEventListener('touchmove', this.onTouchmove, { passive: false })
-    window.addEventListener('touchcancel', this.onTouchcancel, {
+    const target = this.mindMap.opt.touchEventBindEl || window
+    target.addEventListener('touchstart', this.onTouchstart, { passive: false })
+    target.addEventListener('touchmove', this.onTouchmove, { passive: false })
+    target.addEventListener('touchcancel', this.onTouchcancel, {
       passive: false
     })
-    window.addEventListener('touchend', this.onTouchend, { passive: false })
+    target.addEventListener('touchend', this.onTouchend, { passive: false })
   }
 
   // 解绑事件
   unBindEvent() {
-    window.removeEventListener('touchstart', this.onTouchstart)
-    window.removeEventListener('touchmove', this.onTouchmove)
-    window.removeEventListener('touchcancel', this.onTouchcancel)
-    window.removeEventListener('touchend', this.onTouchend)
+    const target = this.mindMap.opt.touchEventBindEl || window
+    target.removeEventListener('touchstart', this.onTouchstart)
+    target.removeEventListener('touchmove', this.onTouchmove)
+    target.removeEventListener('touchcancel', this.onTouchcancel)
+    target.removeEventListener('touchend', this.onTouchend)
   }
 
   // 手指按下事件

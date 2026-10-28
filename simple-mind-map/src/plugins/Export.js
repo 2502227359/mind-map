@@ -5,13 +5,17 @@ import {
   removeHTMLEntities,
   resizeImgSize,
   handleSelfCloseTags,
-  addXmlns
+  addXmlns,
+  htmlEscape
 } from '../utils'
 import { SVG } from '@svgdotjs/svg.js'
 import drawBackgroundImageToCanvas from '../utils/simulateCSSBackgroundInCanvas'
 import { transformToMarkdown } from '../parse/toMarkdown'
 import { ERROR_TYPES } from '../constants/constant'
 import { transformToTxt } from '../parse/toTxt'
+import { transformToMermaid } from '../parse/toMermaid'
+import { createHtmlDocument } from '../parse/toHtml'
+import { transformToOpml } from '../parse/opml'
 
 //  导出插件
 class Export {
@@ -48,7 +52,7 @@ class Export {
   }
 
   //  获取svg数据
-  async getSvgData(node) {
+  async getSvgData(node, strictImages = false) {
     let {
       exportPaddingX,
       exportPaddingY,
@@ -87,6 +91,7 @@ class Export {
     try {
       await Promise.all(taskList)
     } catch (error) {
+      if (strictImages) throw error
       errorHandler(ERROR_TYPES.EXPORT_LOAD_IMAGE_ERROR, error)
     }
     // 开启了节点富文本编辑，需要增加一些样式
@@ -308,25 +313,18 @@ class Export {
   }
 
   //  在svg上绘制思维导图背景
-  drawBackgroundToSvg(svg) {
-    return new Promise(async resolve => {
-      const {
-        backgroundColor = '#fff',
-        backgroundImage,
-        backgroundRepeat = 'repeat'
-      } = this.mindMap.themeConfig
-      // 背景颜色
-      svg.css('background-color', backgroundColor)
-      // 背景图片
-      if (backgroundImage && backgroundImage !== 'none') {
-        const imgDataUrl = await imgToDataUrl(backgroundImage)
-        svg.css('background-image', `url(${imgDataUrl})`)
-        svg.css('background-repeat', backgroundRepeat)
-        resolve()
-      } else {
-        resolve()
-      }
-    })
+  async drawBackgroundToSvg(svg) {
+    const {
+      backgroundColor = '#fff',
+      backgroundImage,
+      backgroundRepeat = 'repeat'
+    } = this.mindMap.themeConfig
+    svg.css('background-color', backgroundColor)
+    if (backgroundImage && backgroundImage !== 'none') {
+      const imgDataUrl = await imgToDataUrl(backgroundImage)
+      svg.css('background-image', `url(${imgDataUrl})`)
+      svg.css('background-repeat', backgroundRepeat)
+    }
   }
 
   // 导出为指定格式的图片
@@ -386,33 +384,39 @@ class Export {
   }
 
   // 导出为xmind
-  async xmind(name) {
+  async xmind(name, transformMindMapData) {
     if (!this.mindMap.doExportXMind) {
       throw new Error('请注册ExportXMind插件')
     }
     const data = this.mindMap.getData()
+    if (typeof transformMindMapData === 'function') {
+      await transformMindMapData(data)
+    }
     const blob = await this.mindMap.doExportXMind.xmind(data, name)
     const res = await readBlob(blob)
     return res
   }
 
   //  导出为svg
-  async svg(name) {
+  async svg(name, transparent = false, raw = false, strictImages = false) {
     this.mindMap.renderer.textEdit.hideEditTextBox()
-    const { node } = await this.getSvgData()
-    node.first().before(SVG(`<title>${name}</title>`))
-    await this.drawBackgroundToSvg(node)
+    const { node } = await this.getSvgData(null, strictImages)
+    node.first().before(SVG(`<title>${htmlEscape(String(name || ''))}</title>`))
+    if (!transparent) {
+      await this.drawBackgroundToSvg(node)
+    }
     const str = node.svg()
-    const res = await this.fixSvgStrAndToBlob(str)
+    const res = await this.fixSvgStrAndToBlob(str, raw)
     return res
   }
 
   // 修复svg字符串，并且转换为blob数据
-  async fixSvgStrAndToBlob(str) {
+  async fixSvgStrAndToBlob(str, raw = false) {
     // 移除字符串中的html实体
     str = removeHTMLEntities(str)
     // 给html自闭合标签添加闭合状态
     str = handleSelfCloseTags(str)
+    if (raw) return str
     // 转换成blob数据
     const blob = new Blob([str], {
       type: 'image/svg+xml'
@@ -422,8 +426,11 @@ class Export {
   }
 
   //  导出为json
-  async json(name, withConfig = true) {
+  async json(name, withConfig = true, transformMindMapData) {
     const data = this.mindMap.getData(withConfig)
+    if (typeof transformMindMapData === 'function') {
+      await transformMindMapData(data)
+    }
     const str = JSON.stringify(data)
     const blob = new Blob([str])
     const res = await readBlob(blob)
@@ -431,15 +438,18 @@ class Export {
   }
 
   //  专有文件，其实就是json文件
-  async smm(name, withConfig) {
-    const res = await this.json(name, withConfig)
+  async smm(name, withConfig, transformMindMapData) {
+    const res = await this.json(name, withConfig, transformMindMapData)
     return res
   }
 
   // markdown文件
-  async md() {
+  async md(name, maxLevel = 6) {
     const data = this.mindMap.getData()
-    const content = transformToMarkdown(data)
+    const level = Number(maxLevel)
+    const normalizedLevel =
+      Number.isInteger(level) && level >= 1 && level <= 6 ? level : 6
+    const content = transformToMarkdown(data, normalizedLevel)
     const blob = new Blob([content])
     const res = await readBlob(blob)
     return res
@@ -452,6 +462,26 @@ class Export {
     const blob = new Blob([content])
     const res = await readBlob(blob)
     return res
+  }
+
+  // 保留现有 SVG 资源内嵌流程，生成可离线阅读的静态网页。
+  async html(name) {
+    const svgDataUrl = await this.svg(name, false, false, true)
+    return readBlob(new Blob([createHtmlDocument(svgDataUrl, name)], {
+      type: 'text/html;charset=utf-8'
+    }))
+  }
+
+  async mmd() {
+    return readBlob(new Blob([transformToMermaid(this.mindMap.getData())], {
+      type: 'text/plain;charset=utf-8'
+    }))
+  }
+
+  async opml(name) {
+    return readBlob(new Blob([transformToOpml(this.mindMap.getData(), name)], {
+      type: 'text/xml;charset=utf-8'
+    }))
   }
 }
 

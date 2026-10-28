@@ -116,6 +116,7 @@ export default {
   contextmenu: {
     insertNode: 'Chèn nút',
     insertSiblingNode: 'Node tương đương',
+    insertSiblingNodeAbove: 'Chèn nút cùng cấp ở trên',
     insertChildNode: 'Các nút con',
     insertParentNode: 'Nút cha',
     insertSummary: 'Giới thiệu',
@@ -165,6 +166,9 @@ export default {
     nodeAlgin: 'Căn chỉnh một nút cùng cấp',
     removeCustomWidth: 'Loại bỏ chiều rộng tùy chỉnh',
     copyAsInternalUrl: 'Sao chép như một chuỗi bên trong',
+    searchInNode: 'Tìm kiếm trong nút này',
+    showAssociativeLines: 'Hiển thị đường liên kết',
+    hideAssociativeLines: 'Ẩn đường liên kết',
     removeAllCustomWidth:
       'Loại bỏ tất cả các nút chiều rộng tùy chỉnh với một cú nhấp chuột',
     download: 'Tải xuống',
@@ -490,6 +494,7 @@ export default {
     color: 'Màu sắc',
     backgroundColor: 'Màu nền',
     removeFormat: 'Xóa định dạng',
+    fontSearchPlaceholder: 'Tìm phông chữ',
     textAlign: 'Căn chỉnh văn bản'
   },
   other: {
@@ -510,6 +515,10 @@ export default {
   attachment: {
     deleteAttachment: 'Xóa đính kèm',
     tip: 'Chức năng đính kèm chỉ có sẵn ở phía máy khách'
+  },
+  nodeTagFilter: {
+    title: 'Nút cùng thẻ',
+    empty: 'Không có nút nào khác dùng thẻ này'
   },
   nodeOuterFrame: {
     outerFrameSetting: 'Cài đặt khung ngoài',

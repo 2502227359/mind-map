@@ -53,6 +53,7 @@ const defaultBtnList = [
   'link',
   'note',
   'tag',
+  'attachment',
   'summary',
   'associativeLine',
   'formula',

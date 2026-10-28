@@ -581,6 +581,24 @@ export const downTypeList = [
     icon: 'iconjson',
     desc:
       'Các định dạng trao đổi dữ liệu phổ biến có thể được sử dụng để nhập lại'
+  },
+  {
+    name: 'HTML tĩnh',
+    type: 'html',
+    icon: 'icondaimakuai',
+    desc: 'Bản xem tĩnh ngoại tuyến có ảnh, không hỗ trợ chỉnh sửa'
+  },
+  {
+    name: 'Mermaid',
+    type: 'mmd',
+    icon: 'iconMermaid',
+    desc: 'Lưu cấu trúc và văn bản, không gồm kiểu dáng hoặc ảnh'
+  },
+  {
+    name: 'OPML',
+    type: 'opml',
+    icon: 'icongaiyao',
+    desc: 'Cấu trúc, văn bản, liên kết và ghi chú, không gồm kiểu dáng hoặc ảnh'
   }
 ]
 
@@ -672,12 +690,14 @@ export const layoutGroupList = [
     list: [
       'timeline',
       'timeline2',
-      'verticalTimeline'
+      'verticalTimeline',
+      'verticalTimeline2',
+      'verticalTimeline3'
     ]
   },
   {
     name: 'Bản đồ Fishbone',
-    list: ['fishbone']
+    list: ['fishbone', 'fishbone2']
   }
 ]
 
@@ -693,6 +713,7 @@ export const iconNameMap = {
   summary: 'Chèn tóm tắt',
   associativeLine: 'Thêm đường liên kết',
   formula: 'Chèn công thức toán',
+  attachment: 'Thêm đính kèm',
   outerFrame: 'Thêm khung viền',
   ai: 'AI tạo tự động'
 }

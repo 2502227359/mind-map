@@ -50,9 +50,17 @@
 
     <el-popover placement="bottom" trigger="hover">
       <div class="fontOptionsList" :class="{ isDark: isDark }">
+        <el-input
+          v-model="fontFamilyKeyword"
+          size="mini"
+          clearable
+          :placeholder="$t('richTextToolbar.fontSearchPlaceholder')"
+          @click.native.stop
+          @mousedown.native.stop
+        ></el-input>
         <div
           class="fontOptionItem"
-          v-for="item in fontFamilyList"
+          v-for="item in filteredFontFamilyList"
           :key="item.value"
           :style="{ fontFamily: item.value }"
           :class="{ active: formatInfo.font === item.value }"
@@ -362,6 +370,10 @@ export default {
 
 .fontOptionsList {
   width: 150px;
+
+  .el-input {
+    margin-bottom: 6px;
+  }
 
   &.isDark {
     .fontOptionItem {

@@ -158,7 +158,14 @@ export default {
               top: top - this.mindMap.elRect.top
             }
           },
-          ...options
+          ...options,
+          getKatexOutputType: () => {
+            const api = this.$root.$obsidianAPI || {}
+            if (typeof api.getKatexOutputType === 'function') {
+              return api.getKatexOutputType()
+            }
+            return api.getSettings?.().formulaRenderMode
+          }
         })
       })
     },

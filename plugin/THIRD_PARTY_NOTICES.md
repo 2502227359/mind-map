@@ -34,3 +34,31 @@ SOFTWARE.
 # 参考 Obsidian 插件源码
 
 `plugin/reference/` 直接取自 wanglin2/obsidian-simplemindmap 的公开源码，固定提交见该目录的《来源与改动.md》。作者 wanglin；原项目提供的 AGPL-3.0 许可证完整保存在 `plugin/reference/LICENSE.txt`，构建时一并输出为 `LICENSE-REFERENCE.txt`。原项目链接：<https://github.com/wanglin2/obsidian-simplemindmap>。
+
+## xml-js 1.6.11
+
+OPML 解析复用现有引擎依赖，不新增依赖版本。来源：https://github.com/nashwaan/xml-js 。许可证：MIT。
+
+```text
+The MIT License (MIT)
+
+Copyright (c) 2016-2017 Yousuf Almarzooqi
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```

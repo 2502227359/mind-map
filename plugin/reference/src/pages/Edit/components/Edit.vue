@@ -61,6 +61,15 @@
       :mindMap="mindMap"
     ></NodeTextInputObLink>
     <Demonstrate v-if="mindMap" :mindMap="mindMap"></Demonstrate>
+    <NodeAttachment v-if="mindMap" :mindMap="mindMap"></NodeAttachment>
+    <NodeTagFilterList
+      v-if="mindMap"
+      :mindMap="mindMap"
+    ></NodeTagFilterList>
+    <RainbowRefreshBtn
+      v-if="mindMap"
+      :mindMap="mindMap"
+    ></RainbowRefreshBtn>
     <el-dialog
       class="confirmSplitLineDialog"
       :title="$t('edit.tip')"
@@ -163,6 +172,9 @@ import {
 } from '@/utils'
 import NodeTextInputObLink from './NodeTextInputObLink.vue'
 import Demonstrate from './Demonstrate.vue'
+import NodeAttachment from './NodeAttachment.vue'
+import NodeTagFilterList from './NodeTagFilterList.vue'
+import RainbowRefreshBtn from './RainbowRefreshBtn.vue'
 import { imgFail, obFileHyperlinkIcon, hyperlinkIcon } from '@/config/icons'
 import imgHostingUpload from '@/mixins/imgHostingUpload'
 
@@ -217,7 +229,10 @@ export default {
     NodeImgPlacementToolbar,
     NodeNoteSidebar,
     NodeTextInputObLink,
-    Demonstrate
+    Demonstrate,
+    NodeAttachment,
+    NodeTagFilterList,
+    RainbowRefreshBtn
   },
   data() {
     return {
@@ -291,6 +306,10 @@ export default {
     this.$root.$bus.$on('obTabDeactivate', this.onObTabDeactivate)
     this.$root.$bus.$on('toggleReadonly', this.onToggleReadonly)
     this.$root.$bus.$on('jumpToNodeByUid', this.jumpToNodeByUid)
+    this.$root.$bus.$on(
+      'apply_default_font_to_map',
+      this.applyDefaultFontToMap
+    )
   },
   beforeDestroy() {
     this.$root.$bus.$off('execCommand', this.execCommand)
@@ -319,9 +338,13 @@ export default {
     this.$root.$bus.$off('obTabDeactivate', this.onObTabDeactivate)
     this.$root.$bus.$off('toggleReadonly', this.onToggleReadonly)
     this.$root.$bus.$off('jumpToNodeByUid', this.jumpToNodeByUid)
+    this.$root.$bus.$off(
+      'apply_default_font_to_map',
+      this.applyDefaultFontToMap
+    )
     clearTimeout(this.autoSaveTimer)
     clearTimeout(this.savingTimer)
-    this.mindMap.destroy()
+    ;(this.mindMap || this.tmpMindMap)?.destroy()
   },
   methods: {
     onToggleReadonly(isReadonly) {
@@ -380,9 +403,43 @@ export default {
       this.mindMapConfig = this.$root.$obsidianAPI.getMindMapConfig() || {}
     },
 
+    normalizeRainbowLinesConfig(config) {
+      return {
+        open: !!config?.open,
+        colorsList: Array.isArray(config?.colorsList)
+          ? [...config.colorsList]
+          : []
+      }
+    },
+
+    syncRainbowLinesConfig(themeConfig) {
+      if (!this.mindMap?.rainbowLines) return
+      const config = this.normalizeRainbowLinesConfig(
+        themeConfig?.rainbowLinesConfig
+      )
+      this.mindMap.updateConfig({ rainbowLinesConfig: config })
+      this.mindMap.rainbowLines.updateRainLinesConfig(config)
+    },
+
+    includeRainbowLinesConfig(data) {
+      const config = this.mindMap?.getConfig('rainbowLinesConfig')
+      if (!config) return data
+      return {
+        ...data,
+        theme: {
+          ...(data.theme || {}),
+          config: {
+            ...(data.theme?.config || {}),
+            rainbowLinesConfig: this.normalizeRainbowLinesConfig(config)
+          }
+        }
+      }
+    },
+
     init() {
       let { root, layout, theme, view } = this.mindMapData
       const config = this.mindMapConfig
+      const rainbowLinesConfig = theme?.config?.rainbowLinesConfig || {}
       this.tmpMindMap = new MindMap({
         el: this.$refs.mindMapContainer,
         touchEventBindEl: this.$refs.mindMapContainer,
@@ -413,6 +470,20 @@ export default {
           openBlankMode: false
         },
         ...(config || {}),
+        rainbowLinesConfig: {
+          open: !!rainbowLinesConfig.open,
+          colorsList: Array.isArray(rainbowLinesConfig.colorsList)
+            ? [...rainbowLinesConfig.colorsList]
+            : []
+        },
+        readonly: this.isReadonly,
+        getKatexOutputType: () => {
+          const api = this.$root.$obsidianAPI || {}
+          if (typeof api.getKatexOutputType === 'function') {
+            return api.getKatexOutputType()
+          }
+          return api.getSettings?.().formulaRenderMode
+        },
         iconList: [...icon],
         useLeftKeySelectionRightKeyDrag: this.useLeftKeySelectionRightKeyDrag,
         customInnerElsAppendTo: this.$refs.editContainer,
@@ -445,7 +516,7 @@ export default {
         errorHandler: (code, err) => {
           switch (code) {
             case 'export_error':
-              this.$root.$obsidianAPI.showTip(this.$t('edit.exportError'))
+              this.$root.$obsidianAPI.showTip(err?.message || this.$t('edit.exportError'))
               break
             default:
               break
@@ -533,7 +604,7 @@ export default {
           }
           CustomLinkBlot.blotName = 'link'
           CustomLinkBlot.tagName = 'a'
-          Quill.register('formats/link', CustomLinkBlot)
+          Quill.register('formats/link', CustomLinkBlot, true)
         },
         handleNodePasteImg: async imgFile => {
           try {
@@ -622,7 +693,8 @@ export default {
         'exit_demonstrate',
         'node_note_dblclick',
         'node_mousedown',
-        'node_img_dblclick'
+        'node_img_dblclick',
+        'node_tag_dblclick'
       ].forEach(event => {
         mindMap.on(event, (...args) => {
           this.$root.$bus.$emit(event, ...args)
@@ -673,6 +745,34 @@ export default {
       this.mindMap.execCommand('GO_TARGET_NODE', uid)
     },
 
+    applyDefaultFontToMap(font) {
+      if (!this.mindMap || this.isReadonly) return
+      const api = this.$root.$obsidianAPI || {}
+      const settings = api.getSettings?.() || {}
+      const value =
+        typeof font === 'string'
+          ? font.trim()
+          : String(font?.fontFamily || settings.defaultNodeFont || '').trim()
+      const current = this.mindMap.getCustomThemeConfig() || {}
+      const next = JSON.parse(JSON.stringify(current))
+      ;['root', 'second', 'node', 'generalization'].forEach(group => {
+        if (value) {
+          next[group] = { ...(next[group] || {}), fontFamily: value }
+          return
+        }
+        if (!next[group]) return
+        next[group] = { ...next[group] }
+        delete next[group].fontFamily
+        if (Object.keys(next[group]).length === 0) delete next[group]
+      })
+      this.mindMap.setThemeConfig(next)
+      this.mindMapData = {
+        ...this.mindMapData,
+        theme: { ...(this.mindMapData.theme || {}), config: next }
+      }
+      this.saveToLocal()
+    },
+
     handleSplitLine(type) {
       if (type === 1) {
         this.confirmSplitLineTaskReject()
@@ -691,6 +791,7 @@ export default {
       if (data.root) {
         this.mindMapData = data
         this.mindMap.setFullData(data)
+        this.syncRainbowLinesConfig(data.theme?.config)
       } else {
         this.updateMindMapData(
           {
@@ -736,6 +837,7 @@ export default {
             ) {
               this.mindMap.setThemeConfig(data.theme.config)
             }
+            this.syncRainbowLinesConfig(data.theme.config)
           }
           this.updateMindMapData(data, false)
         }
@@ -799,7 +901,9 @@ export default {
       this.savingTimer = setTimeout(async () => {
         try {
           this.isSaving = true
-          const data = this.mindMap.getData(true)
+          const data = this.includeRainbowLinesConfig(
+            this.mindMap.getData(true)
+          )
           if (!data.root) {
             this.$root.$obsidianAPI.showTip(this.$t('edit.savingTip2'))
             this.isSaving = false
@@ -843,7 +947,9 @@ export default {
           if (typeof resolve === 'function') resolve(null)
           return null
         }
-        const data = this.mindMap.getData(true)
+        const data = this.includeRainbowLinesConfig(
+          this.mindMap.getData(true)
+        )
         if (!data || !data.root) {
           this.$root.$obsidianAPI.showTip(this.$t('edit.savingTip2'))
           if (typeof resolve === 'function') resolve(null)

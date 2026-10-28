@@ -7,7 +7,8 @@ import {
   addXmlns,
   generateColorByContent,
   camelCaseToHyphen,
-  getNodeRichTextStyles
+  getNodeRichTextStyles,
+  transformInnerElsPosition
 } from '../../../utils'
 import { Image as SVGImage, SVG, A, G, Rect, Text } from '@svgdotjs/svg.js'
 import iconsSvg from '../../../svg/icons'
@@ -329,8 +330,16 @@ function createHyperlinkNode() {
   if (!hyperlink) {
     return
   }
-  const { customHyperlinkJump, hyperlinkIcon } = this.mindMap.opt
-  const { icon, style } = hyperlinkIcon
+  const {
+    customHyperlinkJump,
+    hyperlinkIcon,
+    dynamicGetHyperlinkIcon
+  } = this.mindMap.opt
+  const currentHyperlinkIcon =
+    typeof dynamicGetHyperlinkIcon === 'function'
+      ? dynamicGetHyperlinkIcon(this, hyperlink, hyperlinkTitle) || hyperlinkIcon
+      : hyperlinkIcon
+  const { icon, style = {} } = currentHyperlinkIcon || {}
   const iconSize = this.getNodeIconSize('hyperlinkIcon')
   const node = new SVG().size(iconSize, iconSize)
   // 超链接节点
@@ -338,7 +347,7 @@ function createHyperlinkNode() {
   a.node.addEventListener('click', e => {
     if (typeof customHyperlinkJump === 'function') {
       e.preventDefault()
-      customHyperlinkJump(hyperlink, this)
+      customHyperlinkJump(hyperlink, this, e)
     }
   })
   if (hyperlinkTitle) {
@@ -386,6 +395,10 @@ function createTagNode() {
     const tag = new G()
     tag.on('click', () => {
       this.mindMap.emit('node_tag_click', this, item, index, tag)
+    })
+    tag.on('dblclick', e => {
+      e.stopPropagation()
+      this.mindMap.emit('node_tag_dblclick', this, item, index, tag, e)
     })
     // 标签文本
     const text = new Text().text(str)
@@ -450,7 +463,9 @@ function createNoteNode() {
     if (!this.noteEl) {
       this.noteEl = document.createElement('div')
       this.noteEl.style.cssText = `
-          position: fixed;
+          position: ${
+            this.mindMap.opt.customInnerElsAppendTo ? 'absolute' : 'fixed'
+          };
           padding: 10px;
           border-radius: 5px;
           box-shadow: 0 2px 5px rgb(0 0 0 / 10%);
@@ -465,7 +480,12 @@ function createNoteNode() {
     this.noteEl.innerText = this.getData('note')
   }
   node.on('mouseover', () => {
-    const { left, top } = this.getNoteContentPosition()
+    const notePosition = this.getNoteContentPosition()
+    const { left, top } = transformInnerElsPosition(
+      this.mindMap,
+      notePosition.left,
+      notePosition.top
+    )
     if (!this.mindMap.opt.customNoteContentShow) {
       this.noteEl.style.left = left + 'px'
       this.noteEl.style.top = top + 'px'

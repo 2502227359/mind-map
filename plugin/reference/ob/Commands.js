@@ -61,6 +61,18 @@ export default class Commands {
 
   _addActionsCommand() {
     this.addCommand({
+      id: 'preview-markdown-as-mindmap',
+      name: this._t('action.previewAsMindMap'),
+      checkCallback: checking => {
+        const view = this.app.workspace.getActiveViewOfType(MarkdownView)
+        if (!view || !view.file || this.plugin._isSmmFile(view.file)) {
+          return false
+        }
+        if (!checking) this.plugin.menus?.previewMarkdownFile(view.file)
+        return true
+      }
+    })
+    this.addCommand({
       id: 'enter-smm-mindmap-demonstrate',
       name: this._t('action.enterDemonstrate'),
       checkCallback: checking => {

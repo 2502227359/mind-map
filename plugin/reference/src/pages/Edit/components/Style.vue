@@ -10,6 +10,7 @@
         <el-select
           size="mini"
           style="width: 105px"
+          filterable
           v-model="style.fontFamily"
           placeholder=""
           @change="update('fontFamily')"

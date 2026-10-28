@@ -576,6 +576,24 @@ export const downTypeList = [
     type: 'json',
     icon: 'iconjson',
     desc: '流行的數據交換格式，可用于再次導入'
+  },
+  {
+    name: 'HTML 靜態網頁',
+    type: 'html',
+    icon: 'icondaimakuai',
+    desc: '可離線閱讀的靜態導圖預覽，包含圖片，不提供編輯'
+  },
+  {
+    name: 'Mermaid',
+    type: 'mmd',
+    icon: 'iconMermaid',
+    desc: '儲存節點層級與文字，不包含導圖樣式或圖片'
+  },
+  {
+    name: 'OPML',
+    type: 'opml',
+    icon: 'icongaiyao',
+    desc: '大綱交換格式，包含層級、文字、連結和備註，不包含導圖樣式或圖片'
   }
 ]
 
@@ -667,12 +685,14 @@ export const layoutGroupList = [
     list: [
       'timeline',
       'timeline2',
-      'verticalTimeline'
+      'verticalTimeline',
+      'verticalTimeline2',
+      'verticalTimeline3'
     ]
   },
   {
     name: '魚骨圖',
-    list: ['fishbone']
+    list: ['fishbone', 'fishbone2']
   }
 ]
 
@@ -688,6 +708,7 @@ export const iconNameMap = {
   summary: '插入概要',
   associativeLine: '添加關聯線',
   formula: '插入數學公式',
+  attachment: '添加附件',
   outerFrame: '添加外框',
   ai: 'AI一鍵生成'
 }

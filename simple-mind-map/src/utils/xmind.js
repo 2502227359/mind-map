@@ -143,7 +143,8 @@ export const handleNodeImageToXmind = async (
   node,
   newData,
   promiseList,
-  imageList
+  imageList,
+  imageMap = null
 ) => {
   if (node.data.image) {
     // 处理异步逻辑
@@ -154,10 +155,11 @@ export const handleNodeImageToXmind = async (
     promiseList.push(promise)
     try {
       let imgName = ''
-      let imgData = node.data.image
+      let imgData =
+        (imageMap && imageMap[node.data.image]) || node.data.image
       // base64之外的其他图片要先转换成data:url
-      if (!/^data:/.test(node.data.image)) {
-        imgData = await imgToDataUrl(node.data.image)
+      if (!/^data:/.test(imgData)) {
+        imgData = await imgToDataUrl(imgData)
       }
       // 从data:url中解析出图片类型和ase64
       let dataUrlRes = parseDataUrl(imgData)

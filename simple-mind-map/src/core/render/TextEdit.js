@@ -8,7 +8,8 @@ import {
   checkSmmFormatData,
   getTextFromHtml,
   isWhite,
-  getVisibleColorFromTheme
+  getVisibleColorFromTheme,
+  transformInnerElsPosition
 } from '../../utils'
 import {
   ERROR_TYPES,
@@ -304,7 +305,10 @@ export default class TextEdit {
       textAutoWrapWidth,
       selectTextOnEnterEditText,
       openRealtimeRenderOnNodeTextEdit,
-      autoEmptyTextWhenKeydownEnterEdit
+      autoEmptyTextWhenKeydownEnterEdit,
+      textEditHeightOverflowCanvasHeightMarginY,
+      handleTextEditHeightOverflowCanvasHeightTop,
+      customInnerElsAppendTo
     } = this.mindMap.opt
     if (!isFromScale) {
       this.mindMap.emit('before_show_text_edit')
@@ -314,7 +318,7 @@ export default class TextEdit {
       this.textEditNode = document.createElement('div')
       this.textEditNode.classList.add(SMM_NODE_EDIT_WRAP)
       this.textEditNode.style.cssText = `
-        position: fixed;
+        position: ${customInnerElsAppendTo ? 'absolute' : 'fixed'};
         box-sizing: border-box;
         ${
           openRealtimeRenderOnNodeTextEdit
@@ -362,6 +366,9 @@ export default class TextEdit {
       targetNode.appendChild(this.textEditNode)
     }
     const scale = this.mindMap.view.scale
+    const maxCanvasHeight =
+      this.mindMap.height - 2 * textEditHeightOverflowCanvasHeightMarginY
+    const isHeightOverflow = rect.height > maxCanvasHeight
     const fontSize = node.style.merge('fontSize')
     const textLines = (this.cacheEditingText || node.getData('text'))
       .split(/\n/gim)
@@ -381,9 +388,31 @@ export default class TextEdit {
     }
     this.textEditNode.style.minWidth =
       rect.width + this.textNodePaddingX * 2 + 'px'
-    this.textEditNode.style.minHeight = rect.height + 'px'
-    this.textEditNode.style.left = Math.floor(rect.left) + 'px'
-    this.textEditNode.style.top = Math.floor(rect.top) + 'px'
+    this.textEditNode.style.minHeight =
+      (isHeightOverflow ? maxCanvasHeight : rect.height) + 'px'
+    if (isHeightOverflow) {
+      this.textEditNode.style.maxHeight = maxCanvasHeight + 'px'
+      this.textEditNode.style.overflowY = 'auto'
+    } else {
+      this.textEditNode.style.maxHeight = ''
+      this.textEditNode.style.overflowY = ''
+    }
+    const position = transformInnerElsPosition(
+      this.mindMap,
+      Math.floor(rect.left),
+      Math.floor(rect.top)
+    )
+    this.textEditNode.style.left = position.left + 'px'
+    this.textEditNode.style.top =
+      (isHeightOverflow
+        ? typeof handleTextEditHeightOverflowCanvasHeightTop === 'function'
+          ? handleTextEditHeightOverflowCanvasHeightTop()
+          : transformInnerElsPosition(
+              this.mindMap,
+              this.mindMap.elRect.left,
+              this.mindMap.elRect.top + textEditHeightOverflowCanvasHeightMarginY
+            ).top
+        : position.top) + 'px'
     this.textEditNode.style.display = 'block'
     this.textEditNode.style.maxWidth = textAutoWrapWidth * scale + 'px'
     if (isMultiLine) {
@@ -426,12 +455,37 @@ export default class TextEdit {
       return
     }
     const rect = this.currentNode._textData.node.node.getBoundingClientRect()
+    const {
+      textEditHeightOverflowCanvasHeightMarginY,
+      handleTextEditHeightOverflowCanvasHeightTop
+    } = this.mindMap.opt
+    const maxCanvasHeight =
+      this.mindMap.height - 2 * textEditHeightOverflowCanvasHeightMarginY
+    const isHeightOverflow = rect.height > maxCanvasHeight
     this.textEditNode.style.minWidth =
       rect.width + this.textNodePaddingX * 2 + 'px'
     this.textEditNode.style.minHeight =
-      rect.height + this.textNodePaddingY * 2 + 'px'
-    this.textEditNode.style.left = Math.floor(rect.left) + 'px'
-    this.textEditNode.style.top = Math.floor(rect.top) + 'px'
+      (isHeightOverflow ? maxCanvasHeight : rect.height) + 'px'
+    this.textEditNode.style.maxHeight = isHeightOverflow
+      ? maxCanvasHeight + 'px'
+      : ''
+    this.textEditNode.style.overflowY = isHeightOverflow ? 'auto' : ''
+    const position = transformInnerElsPosition(
+      this.mindMap,
+      Math.floor(rect.left),
+      Math.floor(rect.top)
+    )
+    this.textEditNode.style.left = position.left + 'px'
+    this.textEditNode.style.top =
+      (isHeightOverflow
+        ? typeof handleTextEditHeightOverflowCanvasHeightTop === 'function'
+          ? handleTextEditHeightOverflowCanvasHeightTop()
+          : transformInnerElsPosition(
+              this.mindMap,
+              this.mindMap.elRect.left,
+              this.mindMap.elRect.top + textEditHeightOverflowCanvasHeightMarginY
+            ).top
+        : position.top) + 'px'
   }
 
   // 获取编辑区域的背景填充

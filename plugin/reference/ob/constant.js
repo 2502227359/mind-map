@@ -5,12 +5,34 @@ export const SMM_FILE_EXTENSION = 'smm'
 
 export const SMM_TAG = 'simplemindmap'
 
+export const DEFAULT_NODE_FONT = '微软雅黑, Microsoft YaHei'
+
+export const CODE_BLOCK_MIN_HEIGHT = 180
+export const CODE_BLOCK_MAX_HEIGHT = 2000
+
+export const normalizeCodeBlockHeight = (value, fallback = 300) => {
+  const number = Number(value)
+  return Number.isInteger(number) &&
+    number >= CODE_BLOCK_MIN_HEIGHT &&
+    number <= CODE_BLOCK_MAX_HEIGHT
+    ? number
+    : fallback
+}
+
+export const normalizePositiveInteger = (value, fallback) => {
+  const number = Number(value)
+  return Number.isInteger(number) && number > 0 ? number : fallback
+}
+
 export const getDefaultSmmData = (options = {}) => {
   const theme = options.theme || 'classic13'
   const layout = options.layout || 'logicalStructure'
   const rootNodeDefaultText = options.rootNodeDefaultText || 'Root node' // 根节点
   const secondNodeDefaultText = options.secondNodeDefaultText || 'Second node' // 二级节点
   const branchNodeDefaultText = options.branchNodeDefaultText || 'Branch node' // 分支主题
+  const themeConfig = options.themeConfig && typeof options.themeConfig === 'object'
+    ? options.themeConfig
+    : {}
   return {
     root: {
       data: { text: rootNodeDefaultText },
@@ -24,7 +46,7 @@ export const getDefaultSmmData = (options = {}) => {
         }
       ]
     },
-    theme: { template: theme, config: {} },
+    theme: { template: theme, config: themeConfig },
     layout
   }
 }
@@ -33,10 +55,12 @@ export const DEFAULT_SETTINGS = {
   isFirstUse: false,
   fileNameFormat: 'MindMap {date:YYYY-MM-DD HH.mm.ss}',
   lang: 'zh',
+  langFollowOb: true,
   themeMode: 'follow',
   defaultLayout: 'logicalStructure',
   defaultTheme: 'classic13',
   defaultThemeDark: 'classic',
+  defaultNodeFont: DEFAULT_NODE_FONT,
   filePathType: 'root',
   filePath: '',
   imagePathType: 'currentFileFolder',
@@ -52,6 +76,8 @@ export const DEFAULT_SETTINGS = {
   compressImageIsTransparent: false,
   embedDblClickNewWindow: true,
   autoSaveTime: 5,
+  codeBlockInitHeight: 300,
+  codeBlockBgIsTransparent: false,
   mindMapConfig: null,
   mindMapLocalConfig: null,
   supportObSearch: true,
@@ -61,7 +87,10 @@ export const DEFAULT_SETTINGS = {
   embedImageIsSeparateFileFolder: '.smm-embed-image-files',
   nodePasteImageNameFormat: '{notename}_pasteImage',
   embedLinkNewWindowOpen: true,
-  useImgHosting: false
+  useImgHosting: false,
+  templatePath: '',
+  formulaRenderMode: 'mathml',
+  addedFonts: []
 }
 
 let smmEditViewCount = 0

@@ -252,6 +252,9 @@ class Render {
     // 插入同级节点
     this.insertNode = this.insertNode.bind(this)
     this.mindMap.command.add('INSERT_NODE', this.insertNode)
+    // 在当前节点前插入同级节点
+    this.insertNodeUp = this.insertNodeUp.bind(this)
+    this.mindMap.command.add('INSERT_NODE_UP', this.insertNodeUp)
     // 插入多个同级节点
     this.insertMultiNode = this.insertMultiNode.bind(this)
     this.mindMap.command.add('INSERT_MULTI_NODE', this.insertMultiNode)
@@ -391,6 +394,10 @@ class Render {
     // 插入同级节点
     this.mindMap.keyCommand.addShortcut('Enter', () => {
       this.mindMap.execCommand('INSERT_NODE')
+    })
+    // 在当前节点前插入同级节点
+    this.mindMap.keyCommand.addShortcut('Shift+Enter', () => {
+      this.mindMap.execCommand('INSERT_NODE_UP')
     })
     // 插入父节点
     this.mindMap.keyCommand.addShortcut('Shift+Tab', () => {
@@ -787,7 +794,8 @@ class Render {
     openEdit = true,
     appointNodes = [],
     appointData = null,
-    appointChildren = []
+    appointChildren = [],
+    insertBefore = false
   ) {
     appointNodes = formatDataToArray(appointNodes)
     if (this.activeNodeList.length <= 0 && appointNodes.length <= 0) {
@@ -843,13 +851,33 @@ class Render {
         children: [...createUidForAppointNodes(appointChildren, createNewId)]
       }
       createNewId = true
-      parent.nodeData.children.splice(index + 1, 0, newNodeData)
+      parent.nodeData.children.splice(
+        insertBefore ? index : index + 1,
+        0,
+        newNodeData
+      )
     })
     // 如果同时对多个节点插入子节点，需要清除原来激活的节点
     if (focusNewNode) {
       this.clearActiveNodeList()
     }
     this.mindMap.render()
+  }
+
+  // 在当前节点前插入同级节点
+  insertNodeUp(
+    openEdit = true,
+    appointNodes = [],
+    appointData = null,
+    appointChildren = []
+  ) {
+    this.insertNode(
+      openEdit,
+      appointNodes,
+      appointData,
+      appointChildren,
+      true
+    )
   }
 
   // 插入多个同级节点

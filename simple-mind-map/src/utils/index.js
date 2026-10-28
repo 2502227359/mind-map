@@ -524,6 +524,28 @@ export const isUndef = data => {
   return data === null || data === undefined || data === ''
 }
 
+// 将视口坐标转换为自定义内部元素容器坐标
+export const transformInnerElsPosition = (mindMap, left, top) => {
+  const {
+    customInnerElsAppendTo,
+    handleElPositionOnCustomInnerElsAppendTo
+  } = mindMap.opt
+  if (
+    customInnerElsAppendTo &&
+    typeof handleElPositionOnCustomInnerElsAppendTo === 'function'
+  ) {
+    const position = handleElPositionOnCustomInnerElsAppendTo(left, top)
+    if (
+      position &&
+      typeof position.left === 'number' &&
+      typeof position.top === 'number'
+    ) {
+      return position
+    }
+  }
+  return { left, top }
+}
+
 // 移除html字符串中节点的内联样式
 export const removeHtmlStyle = html => {
   return html.replace(/(<[^\s]+)\s+style=["'][^'"]+["']\s*(>)/g, '$1$2')

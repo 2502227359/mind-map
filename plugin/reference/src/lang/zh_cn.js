@@ -109,6 +109,7 @@ export default {
   contextmenu: {
     insertNode: '插入节点',
     insertSiblingNode: '同级节点',
+    insertSiblingNodeAbove: '在上方插入同级节点',
     insertChildNode: '子节点',
     insertParentNode: '父节点',
     insertSummary: '概要',
@@ -158,6 +159,9 @@ export default {
     nodeAlgin: '一键同级节点对齐',
     removeCustomWidth: '去除自定义宽度',
     copyAsInternalUrl: '复制为ob内链',
+    searchInNode: '在当前节点范围内搜索',
+    showAssociativeLines: '显示关联线',
+    hideAssociativeLines: '隐藏关联线',
     removeAllCustomWidth: '一键去除所有节点自定义宽度',
     download: '下载到本地',
     copyNodeToTxt: '复制为纯文本'
@@ -474,6 +478,7 @@ export default {
     color: '字体颜色',
     backgroundColor: '背景颜色',
     removeFormat: '清除样式',
+    fontSearchPlaceholder: '搜索字体',
     textAlign: '对齐方式'
   },
   other: {
@@ -493,6 +498,10 @@ export default {
   attachment: {
     deleteAttachment: '删除附件',
     tip: '附件功能仅在客户端可用'
+  },
+  nodeTagFilter: {
+    title: '同标签节点',
+    empty: '没有其他节点使用此标签'
   },
   nodeOuterFrame: {
     nodeOuterFrameStyle: '外框样式',

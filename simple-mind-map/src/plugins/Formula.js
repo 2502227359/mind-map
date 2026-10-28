@@ -74,7 +74,8 @@ class Formula {
       static create(value) {
         let node = super.create(value)
         if (typeof value === 'string') {
-          katex.render(value, node, self.config)
+          // Quill 的格式注册是全局的，渲染时读取当前配置，避免锁定首个实例。
+          katex.render(value, node, self.getKatexConfig())
           node.setAttribute('data-value', htmlEscape(value))
         }
         return node

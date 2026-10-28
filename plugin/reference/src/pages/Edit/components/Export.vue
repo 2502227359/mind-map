@@ -26,7 +26,13 @@
             }"
             @click="exportType = item.type"
           >
-            <div class="typeIcon" :class="[item.type]"></div>
+            <div class="typeIcon" :class="[item.type]">
+              <span
+                v-if="['html', 'mmd', 'opml'].includes(item.type)"
+                class="iconfont"
+                :class="item.icon"
+              ></span>
+            </div>
             <div class="name">{{ item.name }}</div>
             <div class="icon checked el-icon-check"></div>
           </div>
@@ -192,7 +198,7 @@ export default {
     },
 
     noOptions() {
-      return ['md', 'xmind', 'txt', 'xlsx', 'mm'].includes(
+      return ['md', 'xmind', 'txt', 'xlsx', 'mm', 'html', 'mmd', 'opml'].includes(
         this.exportType
       )
     }
@@ -583,6 +589,12 @@ export default {
             width: 23px;
             height: 26px;
             background-size: cover;
+
+            .iconfont {
+              font-size: 25px;
+              line-height: 26px;
+              color: var(--text-muted, #606266);
+            }
 
             &.png {
               background-image: url('../../../assets/img/foramt/2.png');

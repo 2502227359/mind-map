@@ -2,7 +2,8 @@ import { Text } from '@svgdotjs/svg.js'
 import {
   getStrWithBrFromHtml,
   focusInput,
-  selectAllInput
+  selectAllInput,
+  transformInnerElsPosition
 } from '../../utils/index'
 
 const ASSOCIATIVE_LINE_TEXT_EDIT_WRAP = 'associative-line-text-edit-warp'
@@ -46,7 +47,9 @@ function showEditTextBox(g) {
   if (!this.textEditNode) {
     this.textEditNode = document.createElement('div')
     this.textEditNode.className = ASSOCIATIVE_LINE_TEXT_EDIT_WRAP
-    this.textEditNode.style.cssText = `position:fixed;box-sizing: border-box;background-color:#fff;box-shadow: 0 0 20px rgba(0,0,0,.5);padding: 3px 5px;margin-left: -5px;margin-top: -3px;outline: none; word-break: break-all;`
+    this.textEditNode.style.cssText = `position:${
+      this.mindMap.opt.customInnerElsAppendTo ? 'absolute' : 'fixed'
+    };box-sizing: border-box;background-color:#fff;box-shadow: 0 0 20px rgba(0,0,0,.5);padding: 3px 5px;margin-left: -5px;margin-top: -3px;outline: none; word-break: break-all;`
     this.textEditNode.setAttribute('contenteditable', true)
     this.textEditNode.addEventListener('keyup', e => {
       e.stopPropagation()
@@ -113,8 +116,13 @@ function updateTextEditBoxPos(g) {
   if (this.textEditNode) {
     this.textEditNode.style.minWidth = `${rect.width + 10}px`
     this.textEditNode.style.minHeight = `${rect.height + 6}px`
-    this.textEditNode.style.left = `${rect.left}px`
-    this.textEditNode.style.top = `${rect.top}px`
+    const position = transformInnerElsPosition(
+      this.mindMap,
+      rect.left,
+      rect.top
+    )
+    this.textEditNode.style.left = `${position.left}px`
+    this.textEditNode.style.top = `${position.top}px`
   }
 }
 

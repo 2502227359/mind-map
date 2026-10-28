@@ -169,6 +169,7 @@
             <el-select
               size="mini"
               style="width: 130px;"
+              filterable
               v-model="styleConfig.fontFamily"
               placeholder=""
               @change="

@@ -89,6 +89,12 @@ export const defaultOpt = {
   initRootNodePosition: null,
   // 节点文本编辑框的z-index
   nodeTextEditZIndex: 3000,
+  // 文本编辑框超出画布时是否自动调整视图
+  textEidtNoOverCanvas: false,
+  // 文本编辑框超出画布时，编辑框与画布边缘的上下间距
+  textEditHeightOverflowCanvasHeightMarginY: 10,
+  // 文本编辑框超出画布时自定义顶部位置
+  handleTextEditHeightOverflowCanvasHeightTop: null,
   // 节点备注浮层的z-index
   nodeNoteTooltipZIndex: 3000,
   // 是否在点击了画布外的区域时结束节点文本的编辑状态
@@ -128,6 +134,10 @@ export const defaultOpt = {
   customCreateNodeContent: null,
   // 指定内部一些元素（节点文本编辑元素、节点备注显示元素、关联线文本编辑元素、节点图片调整按钮元素）添加到的位置，默认添加到document.body下
   customInnerElsAppendTo: null,
+  // 当内部元素添加到自定义容器时，将视口坐标转换为容器坐标
+  handleElPositionOnCustomInnerElsAppendTo: null,
+  // 触摸事件监听元素，未指定时监听window
+  touchEventBindEl: null,
   // 是否在存在一个激活节点时，当按下中文、英文、数字按键时自动进入文本编辑模式
   // 开启该特性后，需要给你的输入框绑定keydown事件，并禁止冒泡
   enableAutoEnterTextEditWhenKeydown: false,
@@ -240,6 +250,8 @@ export const defaultOpt = {
   // 自定义超链接的跳转
   // 如果不传，默认会以新窗口的方式打开超链接，可以传递一个函数，函数接收两个参数：link（超链接的url）、node（所属节点实例），只要传递了函数，就会阻止默认的跳转
   customHyperlinkJump: null,
+  // 根据节点和超链接内容动态返回超链接图标配置
+  dynamicGetHyperlinkIcon: null,
   // 是否开启性能模式，默认情况下所有节点都会直接渲染，无论是否处于画布可视区域，这样当节点数量比较多时（1000+）会比较卡，如果你的数据量比较大，那么可以通过该配置开启性能模式，即只渲染画布可视区域内的节点，超出的节点不渲染，这样会大幅提高渲染速度，当然同时也会带来一些其他问题，比如：1.当拖动或是缩放画布时会实时计算并渲染未节点的节点，所以会带来一定卡顿；2.导出图片、svg、pdf时需要先渲染全部节点，所以会比较慢；3.其他目前未发现的问题
   openPerformance: false,
   // 性能优化模式配置
@@ -445,6 +457,12 @@ export const defaultOpt = {
   // 【Search插件】
   // 是否仅搜索当前渲染的节点，被收起的节点不会被搜索到
   isOnlySearchCurrentRenderNodes: false,
+
+  // 【RichText插件】
+  // 允许富文本编辑器额外使用的Quill格式
+  enableQuillFormatList: [],
+  // 初始化富文本编辑器前扩展Quill
+  customExtendQuill: null,
 
   // 【Cooperate插件】
   // 协同编辑时，节点操作即将更新到其他客户端前的生命周期函数

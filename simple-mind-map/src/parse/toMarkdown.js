@@ -8,22 +8,24 @@ const getTitleMark = level => {
   return new Array(level).fill('#').join('')
 }
 
-const getIndentMark = level => {
-  return new Array(level - 6).fill('   ').join('') + '*'
+const getIndentMark = (level, maxLevel) => {
+  return new Array(level - maxLevel).fill('   ').join('') + '*'
 }
 
 // 转换成markdown格式
-export const transformToMarkdown = root => {
+export const transformToMarkdown = (root, maxLevel = 6) => {
+  const level = Number(maxLevel)
+  maxLevel = Number.isInteger(level) && level >= 1 && level <= 6 ? level : 6
   let content = ''
   walk(
     root,
     null,
     (node, parent, isRoot, layerIndex) => {
       const level = layerIndex + 1
-      if (level <= 6) {
+      if (level <= maxLevel) {
         content += getTitleMark(level)
       } else {
-        content += getIndentMark(level)
+        content += getIndentMark(level, maxLevel)
       }
       content += ' ' + getNodeText(node.data)
       // 概要

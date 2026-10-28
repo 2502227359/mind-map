@@ -224,6 +224,7 @@ const transformOldXmind = content => {
 const transformToXmind = async (data, name) => {
   const id = 'simpleMindMap_' + Date.now()
   const imageList = []
+  const imageMap = data.data && data.data.imgMap
   // 转换核心数据
   let newTree = {}
   let waitLoadImageList = []
@@ -258,7 +259,13 @@ const transformToXmind = async (data, name) => {
       })
     }
     // 图片
-    handleNodeImageToXmind(node, newNode, waitLoadImageList, imageList)
+    handleNodeImageToXmind(
+      node,
+      newNode,
+      waitLoadImageList,
+      imageList,
+      imageMap
+    )
     // 样式
     // 暂时不考虑样式
     if (isRoot) {

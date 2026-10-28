@@ -93,7 +93,8 @@ export default {
       showSearchInfo: false,
       searchResultListHeight: 0,
       searchResultList: [],
-      showSearchResultList: false
+      showSearchResultList: false,
+      searchNode: null
     }
   },
   computed: {
@@ -151,8 +152,9 @@ export default {
       this.showSearchInfo = true
     },
 
-    showSearch() {
+    showSearch(node = null) {
       this.$root.$bus.$emit('closeSideBar')
+      this.searchNode = node && typeof node.getData === 'function' ? node : null
       this.show = true
       this.$refs.searchInputRef.focus()
     },
@@ -185,7 +187,7 @@ export default {
 
     onSearchNext() {
       this.showSearchResultList = true
-      this.mindMap.search.search(this.searchText)
+      this.mindMap.search.search(this.searchText, undefined, this.searchNode)
     },
 
     replace() {
@@ -203,6 +205,7 @@ export default {
       this.total = 0
       this.currentIndex = 0
       this.searchText = ''
+      this.searchNode = null
       this.hideReplaceInput()
       this.mindMap.search.endSearch()
     },

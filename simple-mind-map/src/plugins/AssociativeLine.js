@@ -34,6 +34,7 @@ class AssociativeLine {
     this.isNotRenderAllLines = false
     // 当前所有连接线
     this.lineList = []
+    this.linesHidden = false
     // 当前激活的连接线
     this.activeLine = null
     // 当前正在创建连接线
@@ -210,6 +211,11 @@ class AssociativeLine {
   renderAllLines() {
     if (this.isNotRenderAllLines) {
       this.isNotRenderAllLines = false
+      return
+    }
+    if (this.linesHidden) {
+      this.removeAllLines()
+      this.removeControls()
       return
     }
     // 先移除
@@ -443,6 +449,30 @@ class AssociativeLine {
       line[2].remove()
     })
     this.lineList = []
+  }
+
+  // 设置关联线的显示状态
+  setLinesVisibility(visible) {
+    if (visible) {
+      this.showAllLines()
+    } else {
+      this.hideAllLines()
+    }
+  }
+
+  hideAllLines() {
+    if (this.linesHidden) return
+    this.linesHidden = true
+    this.removeAllLines()
+    this.removeControls()
+    this.mindMap.emit('associative_line_visibility_change', false)
+  }
+
+  showAllLines() {
+    if (!this.linesHidden) return
+    this.linesHidden = false
+    this.renderAllLines()
+    this.mindMap.emit('associative_line_visibility_change', true)
   }
 
   // 从当前激活节点开始创建连接线

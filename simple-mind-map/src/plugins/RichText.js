@@ -10,7 +10,8 @@ import {
   nodeRichTextToTextWithWrap,
   getNodeRichTextStyles,
   htmlEscape,
-  compareVersion
+  compareVersion,
+  transformInnerElsPosition
 } from '../utils'
 import { richTextSupportStyleList } from '../constants/constant'
 import MindMapNode from '../core/render/node/MindMapNode'
@@ -162,23 +163,26 @@ class RichText {
 
   // 扩展quill编辑器
   extendQuill() {
-    if (extended) {
-      return
+    if (!extended) {
+      extended = true
+
+      this.extendFont([])
+
+      this.extendAlign()
+
+      // 扩展quill的字号列表
+      const SizeAttributor = Quill.import('attributors/class/size')
+      SizeAttributor.whitelist = fontSizeList
+      Quill.register(SizeAttributor, true)
+
+      const SizeStyle = Quill.import('attributors/style/size')
+      SizeStyle.whitelist = fontSizeList
+      Quill.register(SizeStyle, true)
     }
-    extended = true
-
-    this.extendFont([])
-
-    this.extendAlign()
-
-    // 扩展quill的字号列表
-    const SizeAttributor = Quill.import('attributors/class/size')
-    SizeAttributor.whitelist = fontSizeList
-    Quill.register(SizeAttributor, true)
-
-    const SizeStyle = Quill.import('attributors/style/size')
-    SizeStyle.whitelist = fontSizeList
-    Quill.register(SizeStyle, true)
+    const { customExtendQuill } = this.mindMap.opt
+    if (typeof customExtendQuill === 'function') {
+      customExtendQuill(Quill)
+    }
   }
 
   // 扩展字体列表
@@ -214,7 +218,10 @@ class RichText {
       selectTextOnEnterEditText,
       transformRichTextOnEnterEdit,
       openRealtimeRenderOnNodeTextEdit,
-      autoEmptyTextWhenKeydownEnterEdit
+      autoEmptyTextWhenKeydownEnterEdit,
+      textEidtNoOverCanvas,
+      textEditHeightOverflowCanvasHeightMarginY,
+      handleTextEditHeightOverflowCanvasHeightTop
     } = this.mindMap.opt
     textAutoWrapWidth = node.hasCustomWidth()
       ? node.customTextWidth
@@ -240,7 +247,7 @@ class RichText {
       this.textEditNode = document.createElement('div')
       this.textEditNode.classList.add('smm-richtext-node-edit-wrap')
       this.textEditNode.style.cssText = `
-        position:fixed;
+        position:${customInnerElsAppendTo ? 'absolute' : 'fixed'};
         box-sizing: border-box;
         ${
           openRealtimeRenderOnNodeTextEdit
@@ -274,12 +281,52 @@ class RichText {
       this.textEditNode.style.background =
         this.mindMap.renderer.textEdit.getBackground(node)
     }
+    const maxCanvasHeight =
+      (this.mindMap.height - 2 * textEditHeightOverflowCanvasHeightMarginY) /
+      scaleY
+    const isHeightOverflow = originHeight > maxCanvasHeight
     this.textEditNode.style.minWidth = originWidth + paddingX * 2 + 'px'
-    this.textEditNode.style.minHeight = originHeight + 'px'
-    this.textEditNode.style.left = rect.left + 'px'
-    this.textEditNode.style.top = rect.top + 'px'
+    this.textEditNode.style.minHeight =
+      (isHeightOverflow ? maxCanvasHeight : originHeight) + 'px'
+    const position = transformInnerElsPosition(
+      this.mindMap,
+      rect.left,
+      rect.top
+    )
+    let maxWidth = textAutoWrapWidth + paddingX * 2
+    let maxHeight = isHeightOverflow ? maxCanvasHeight : 0
+    if (textEidtNoOverCanvas) {
+      const canvasBottom = transformInnerElsPosition(
+        this.mindMap,
+        this.mindMap.elRect.right,
+        this.mindMap.elRect.bottom
+      )
+      const widthInCanvas = (canvasBottom.left - position.left) / scaleX
+      if (widthInCanvas < maxWidth) maxWidth = widthInCanvas
+      if (!isHeightOverflow) {
+        maxHeight = (canvasBottom.top - position.top) / scaleY
+      }
+    }
+    if (maxHeight > 0) {
+      this.textEditNode.style.maxHeight = maxHeight + 'px'
+      this.textEditNode.style.overflowY = 'auto'
+    } else {
+      this.textEditNode.style.maxHeight = ''
+      this.textEditNode.style.overflowY = ''
+    }
+    this.textEditNode.style.left = position.left + 'px'
+    this.textEditNode.style.top =
+      (isHeightOverflow
+        ? typeof handleTextEditHeightOverflowCanvasHeightTop === 'function'
+          ? handleTextEditHeightOverflowCanvasHeightTop()
+          : transformInnerElsPosition(
+              this.mindMap,
+              this.mindMap.elRect.left,
+              this.mindMap.elRect.top + textEditHeightOverflowCanvasHeightMarginY
+            ).top
+        : position.top) + 'px'
     this.textEditNode.style.display = 'block'
-    this.textEditNode.style.maxWidth = textAutoWrapWidth + paddingX * 2 + 'px'
+    this.textEditNode.style.maxWidth = maxWidth + 'px'
     this.textEditNode.style.transform = `scale(${scaleX}, ${scaleY})`
     this.textEditNode.style.transformOrigin = 'left top'
     // 节点文本内容
@@ -349,12 +396,42 @@ class RichText {
     const rect = g.node.getBoundingClientRect()
     const originWidth = g.attr('data-width')
     const originHeight = g.attr('data-height')
+    const scaleY = Math.ceil(rect.height) / originHeight
+    const {
+      textEditHeightOverflowCanvasHeightMarginY,
+      handleTextEditHeightOverflowCanvasHeightTop
+    } = this.mindMap.opt
+    const maxCanvasHeight =
+      (this.mindMap.height - 2 * textEditHeightOverflowCanvasHeightMarginY) /
+      scaleY
+    const isHeightOverflow = originHeight > maxCanvasHeight
     this.textEditNode.style.minWidth =
       originWidth + this.textNodePaddingX * 2 + 'px'
-    this.textEditNode.style.minHeight = originHeight + 'px'
-    this.textEditNode.style.left = rect.left + 'px'
-    this.textEditNode.style.top = rect.top + 'px'
-    this.setQuillContainerMinHeight(originHeight)
+    this.textEditNode.style.minHeight =
+      (isHeightOverflow ? maxCanvasHeight : originHeight) + 'px'
+    this.textEditNode.style.maxHeight = isHeightOverflow
+      ? maxCanvasHeight + 'px'
+      : ''
+    this.textEditNode.style.overflowY = isHeightOverflow ? 'auto' : ''
+    const position = transformInnerElsPosition(
+      this.mindMap,
+      rect.left,
+      rect.top
+    )
+    this.textEditNode.style.left = position.left + 'px'
+    this.textEditNode.style.top =
+      (isHeightOverflow
+        ? typeof handleTextEditHeightOverflowCanvasHeightTop === 'function'
+          ? handleTextEditHeightOverflowCanvasHeightTop()
+          : transformInnerElsPosition(
+              this.mindMap,
+              this.mindMap.elRect.left,
+              this.mindMap.elRect.top + textEditHeightOverflowCanvasHeightMarginY
+            ).top
+        : position.top) + 'px'
+    this.setQuillContainerMinHeight(
+      isHeightOverflow ? maxCanvasHeight : originHeight
+    )
   }
 
   // 删除文本编辑框元素
@@ -475,8 +552,11 @@ class RichText {
         'font',
         'size',
         'formula',
-        'align'
-      ], // 明确指定允许的格式，不包含有序列表，无序列表等
+        'align',
+        ...(Array.isArray(this.mindMap.opt.enableQuillFormatList)
+          ? this.mindMap.opt.enableQuillFormatList
+          : [])
+      ].filter((item, index, list) => list.indexOf(item) === index), // 明确指定允许的格式，不包含有序列表，无序列表等
       theme: 'snow'
     })
     // 拦截复制事件，即Ctrl + c，去除多余的空行
