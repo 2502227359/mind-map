@@ -1,6 +1,6 @@
 <template>
   <div class="navigatorContainer customScrollbar" :class="{ isDark: isDark }">
-    <div class="item">
+    <div class="item" v-if="!coreMode">
       <el-select
         v-model="lang"
         size="small"
@@ -30,7 +30,7 @@
     <div class="item">
       <MouseAction :isDark="isDark" :mindMap="mindMap"></MouseAction>
     </div>
-    <div class="item">
+    <div class="item" v-if="!coreMode">
       <el-tooltip
         effect="dark"
         :content="
@@ -43,7 +43,7 @@
         <div class="btn iconfont icondaohang1" @click="toggleMiniMap"></div>
       </el-tooltip>
     </div>
-    <div class="item">
+    <div class="item" v-if="!coreMode">
       <!-- <el-switch
         v-model="isReadonly"
         :active-text="$t('navigatorToolbar.readonly')"
@@ -67,13 +67,13 @@
         ></div>
       </el-tooltip>
     </div>
-    <div class="item">
+    <div class="item" v-if="!coreMode">
       <Fullscreen :isDark="isDark" :mindMap="mindMap"></Fullscreen>
     </div>
     <div class="item">
       <Scale :isDark="isDark" :mindMap="mindMap"></Scale>
     </div>
-    <div class="item">
+    <div class="item" v-if="!coreMode">
       <div
         class="btn iconfont"
         :class="[isDark ? 'iconmoon_line' : 'iconlieri']"
@@ -89,10 +89,10 @@
         <div class="btn iconfont iconyuanma" @click="openSourceCodeEdit"></div>
       </el-tooltip>
     </div> -->
-    <div class="item">
+    <div class="item" v-if="!coreMode">
       <Demonstrate :isDark="isDark" :mindMap="mindMap"></Demonstrate>
     </div>
-    <div class="item">
+    <div class="item" v-if="!coreMode">
       <el-dropdown @command="handleCommand">
         <div class="btn el-icon-more"></div>
         <el-dropdown-menu slot="dropdown">
@@ -149,6 +149,10 @@ export default {
   props: {
     mindMap: {
       type: Object
+    },
+    coreMode: {
+      type: Boolean,
+      default: false
     }
   },
   data() {

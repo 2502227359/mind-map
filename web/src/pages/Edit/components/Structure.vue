@@ -25,7 +25,7 @@
 
 <script>
 import Sidebar from './Sidebar.vue'
-import { storeData } from '@/api'
+import { getApi } from '@/api'
 import { mapState } from 'vuex'
 import { layoutImgMap } from '@/config/constant.js'
 import { layoutGroupList } from '@/config'
@@ -79,7 +79,7 @@ export default {
     useLayout(layout) {
       this.layout = layout
       this.mindMap.setLayout(layout)
-      storeData({
+      getApi(this).storeData({
         layout: layout
       })
     }

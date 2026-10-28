@@ -24,8 +24,8 @@
           </div>
         </el-popover>
       </div>
-      <!-- 导出 -->
-      <div class="toolbarBlock">
+      <!-- 网页版文件操作 -->
+      <div class="toolbarBlock" v-if="!obsidian">
         <div class="toolbarBtn" @click="openDirectory" v-if="!isMobile">
           <span class="icon iconfont icondakai"></span>
           <span class="text">{{ $t('toolbar.directory') }}</span>
@@ -131,14 +131,25 @@
           </div>
         </div>
       </div>
+      <!-- Obsidian 文件操作交给宿主处理 -->
+      <div class="toolbarBlock" v-else>
+        <div class="toolbarBtn" @click="onNewFile">
+          <span class="icon iconfont iconxinjian"></span>
+          <span class="text">{{ $t('toolbar.newFile') }}</span>
+        </div>
+        <div class="toolbarBtn" @click="onSaveAs">
+          <span class="icon iconfont iconlingcunwei"></span>
+          <span class="text">{{ $t('toolbar.saveAs') }}</span>
+        </div>
+      </div>
     </div>
-    <NodeImage></NodeImage>
+    <NodeImage v-if="!obsidian"></NodeImage>
     <NodeHyperlink></NodeHyperlink>
-    <NodeIcon></NodeIcon>
+    <NodeIcon v-if="!obsidian"></NodeIcon>
     <NodeNote></NodeNote>
     <NodeTag></NodeTag>
-    <Export></Export>
-    <Import ref="ImportRef"></Import>
+    <Export v-if="!obsidian"></Export>
+    <Import v-if="!obsidian" ref="ImportRef"></Import>
   </div>
 </template>
 
@@ -181,6 +192,12 @@ const defaultBtnList = [
 ]
 
 export default {
+  props: {
+    obsidian: {
+      type: Boolean,
+      default: false
+    }
+  },
   components: {
     NodeImage,
     NodeHyperlink,
@@ -219,6 +236,11 @@ export default {
 
     btnLit() {
       let res = [...defaultBtnList]
+      if (this.obsidian) {
+        res = res.filter(item => {
+          return !['image', 'icon', 'formula', 'attachment', 'outerFrame', 'annotation', 'ai'].includes(item)
+        })
+      }
       if (!this.openNodeRichText) {
         res = res.filter(item => {
           return item !== 'formula'
@@ -251,23 +273,47 @@ export default {
   mounted() {
     this.computeToolbarShow()
     this.computeToolbarShowThrottle = throttle(this.computeToolbarShow, 300)
-    window.addEventListener('resize', this.computeToolbarShowThrottle)
+    if (!this.obsidian) {
+      window.addEventListener('resize', this.computeToolbarShowThrottle)
+    } else if (typeof ResizeObserver === 'function') {
+      this.resizeObserver = new ResizeObserver(this.computeToolbarShowThrottle)
+      this.resizeObserver.observe(this.$el.parentNode || this.$el)
+    }
     this.$bus.$on('lang_change', this.computeToolbarShowThrottle)
-    window.addEventListener('beforeunload', this.onUnload)
+    if (!this.obsidian) window.addEventListener('beforeunload', this.onUnload)
     this.$bus.$on('node_note_dblclick', this.onNodeNoteDblclick)
   },
   beforeDestroy() {
     this.$bus.$off('write_local_file', this.onWriteLocalFile)
-    window.removeEventListener('resize', this.computeToolbarShowThrottle)
+    if (!this.obsidian) {
+      window.removeEventListener('resize', this.computeToolbarShowThrottle)
+    } else if (this.resizeObserver) {
+      this.resizeObserver.disconnect()
+    }
     this.$bus.$off('lang_change', this.computeToolbarShowThrottle)
-    window.removeEventListener('beforeunload', this.onUnload)
+    if (!this.obsidian) window.removeEventListener('beforeunload', this.onUnload)
     this.$bus.$off('node_note_dblclick', this.onNodeNoteDblclick)
   },
   methods: {
+    onNewFile() {
+      if (this.$host && typeof this.$host.onNewFile === 'function') {
+        this.$host.onNewFile()
+      }
+    },
+
+    onSaveAs() {
+      if (this.$host && typeof this.$host.onSaveAs === 'function') {
+        this.$host.onSaveAs()
+      }
+    },
+
     // 计算工具按钮如何显示
     computeToolbarShow() {
       if (!this.$refs.toolbarRef) return
-      const windowWidth = window.innerWidth - 40
+      const width = this.$el.parentNode
+        ? this.$el.parentNode.clientWidth
+        : window.innerWidth
+      const windowWidth = width - 40
       const all = [...this.btnLit]
       let index = 1
       const loopCheck = () => {

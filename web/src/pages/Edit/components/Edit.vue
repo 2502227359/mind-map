@@ -8,13 +8,17 @@
   >
     <div
       class="mindMapContainer"
-      id="mindMapContainer"
+      :id="obsidian ? null : 'mindMapContainer'"
       ref="mindMapContainer"
     ></div>
     <Count :mindMap="mindMap" v-if="!isZenMode"></Count>
-    <Navigator v-if="mindMap" :mindMap="mindMap"></Navigator>
-    <NavigatorToolbar :mindMap="mindMap" v-if="!isZenMode"></NavigatorToolbar>
-    <OutlineSidebar :mindMap="mindMap"></OutlineSidebar>
+    <Navigator v-if="mindMap && !coreMode" :mindMap="mindMap"></Navigator>
+    <NavigatorToolbar
+      :mindMap="mindMap"
+      :core-mode="coreMode"
+      v-if="mindMap && !isZenMode"
+    ></NavigatorToolbar>
+    <OutlineSidebar v-if="!coreMode" :mindMap="mindMap"></OutlineSidebar>
     <Style v-if="mindMap && !isZenMode" :mindMap="mindMap"></Style>
     <BaseStyle
       :data="mindMapData"
@@ -22,36 +26,43 @@
       :mindMap="mindMap"
     ></BaseStyle>
     <AssociativeLineStyle
-      v-if="mindMap"
+      v-if="mindMap && !coreMode"
       :mindMap="mindMap"
     ></AssociativeLineStyle>
     <Theme v-if="mindMap" :data="mindMapData" :mindMap="mindMap"></Theme>
     <Structure :mindMap="mindMap"></Structure>
     <ShortcutKey></ShortcutKey>
-    <Contextmenu v-if="mindMap" :mindMap="mindMap"></Contextmenu>
-    <RichTextToolbar v-if="mindMap" :mindMap="mindMap"></RichTextToolbar>
-    <NodeNoteContentShow
+    <Contextmenu
       v-if="mindMap"
+      :mindMap="mindMap"
+      :core-mode="coreMode"
+    ></Contextmenu>
+    <RichTextToolbar
+      v-if="mindMap && !coreMode && openNodeRichText"
+      :mindMap="mindMap"
+    ></RichTextToolbar>
+    <NodeNoteContentShow
+      v-if="mindMap && !coreMode"
       :mindMap="mindMap"
     ></NodeNoteContentShow>
-    <NodeImgPreview v-if="mindMap" :mindMap="mindMap"></NodeImgPreview>
-    <SidebarTrigger v-if="!isZenMode"></SidebarTrigger>
+    <NodeImgPreview v-if="mindMap && !coreMode" :mindMap="mindMap"></NodeImgPreview>
+    <SidebarTrigger v-if="!isZenMode" :core-mode="coreMode"></SidebarTrigger>
     <Search v-if="mindMap" :mindMap="mindMap"></Search>
-    <NodeIconSidebar v-if="mindMap" :mindMap="mindMap"></NodeIconSidebar>
-    <NodeIconToolbar v-if="mindMap" :mindMap="mindMap"></NodeIconToolbar>
-    <OutlineEdit v-if="mindMap" :mindMap="mindMap"></OutlineEdit>
+    <NodeIconSidebar v-if="mindMap && !coreMode" :mindMap="mindMap"></NodeIconSidebar>
+    <NodeIconToolbar v-if="mindMap && !coreMode" :mindMap="mindMap"></NodeIconToolbar>
+    <OutlineEdit v-if="mindMap && !coreMode" :mindMap="mindMap"></OutlineEdit>
     <Scrollbar v-if="isShowScrollbar && mindMap" :mindMap="mindMap"></Scrollbar>
-    <FormulaSidebar v-if="mindMap" :mindMap="mindMap"></FormulaSidebar>
-    <NodeOuterFrame v-if="mindMap" :mindMap="mindMap"></NodeOuterFrame>
-    <NodeTagStyle v-if="mindMap" :mindMap="mindMap"></NodeTagStyle>
-    <Setting :configData="mindMapConfig" :mindMap="mindMap"></Setting>
+    <FormulaSidebar v-if="mindMap && !coreMode" :mindMap="mindMap"></FormulaSidebar>
+    <NodeOuterFrame v-if="mindMap && !coreMode" :mindMap="mindMap"></NodeOuterFrame>
+    <NodeTagStyle v-if="mindMap && !coreMode" :mindMap="mindMap"></NodeTagStyle>
+    <Setting v-if="!coreMode" :configData="mindMapConfig" :mindMap="mindMap"></Setting>
     <NodeImgPlacementToolbar
-      v-if="mindMap"
+      v-if="mindMap && !coreMode"
       :mindMap="mindMap"
     ></NodeImgPlacementToolbar>
-    <NodeNoteSidebar v-if="mindMap" :mindMap="mindMap"></NodeNoteSidebar>
-    <AiCreate v-if="mindMap && enableAi" :mindMap="mindMap"></AiCreate>
-    <AiChat v-if="enableAi"></AiChat>
+    <NodeNoteSidebar v-if="mindMap && !coreMode" :mindMap="mindMap"></NodeNoteSidebar>
+    <AiCreate v-if="mindMap && enableAi && !obsidian" :mindMap="mindMap"></AiCreate>
+    <AiChat v-if="enableAi && !obsidian"></AiChat>
     <div
       class="dragMask"
       v-if="showDragMask"
@@ -101,7 +112,7 @@ import ShortcutKey from './ShortcutKey.vue'
 import Contextmenu from './Contextmenu.vue'
 import RichTextToolbar from './RichTextToolbar.vue'
 import NodeNoteContentShow from './NodeNoteContentShow.vue'
-import { getData, getConfig, storeData } from '@/api'
+import { getApi } from '@/api'
 import Navigator from './Navigator.vue'
 import NodeImgPreview from './NodeImgPreview.vue'
 import SidebarTrigger from './SidebarTrigger.vue'
@@ -157,6 +168,16 @@ if (typeof MoreThemes !== 'undefined') {
 }
 
 export default {
+  props: {
+    obsidian: {
+      type: Boolean,
+      default: false
+    },
+    coreMode: {
+      type: Boolean,
+      default: false
+    }
+  },
   components: {
     OutlineSidebar,
     Style,
@@ -228,7 +249,7 @@ export default {
     }
   },
   mounted() {
-    showLoading()
+    this.loading().show()
     this.getData()
     this.init()
     this.$bus.$on('execCommand', this.execCommand)
@@ -242,9 +263,9 @@ export default {
     this.$bus.$on('node_tree_render_end', this.handleHideLoading)
     this.$bus.$on('showLoading', this.handleShowLoading)
     this.$bus.$on('localStorageExceeded', this.onLocalStorageExceeded)
-    window.addEventListener('resize', this.handleResize)
+    if (!this.obsidian) window.addEventListener('resize', this.handleResize)
     this.$bus.$on('showDownloadTip', this.showDownloadTip)
-    this.webTip()
+    if (!this.obsidian) this.webTip()
   },
   beforeDestroy() {
     this.$bus.$off('execCommand', this.execCommand)
@@ -258,11 +279,21 @@ export default {
     this.$bus.$off('node_tree_render_end', this.handleHideLoading)
     this.$bus.$off('showLoading', this.handleShowLoading)
     this.$bus.$off('localStorageExceeded', this.onLocalStorageExceeded)
-    window.removeEventListener('resize', this.handleResize)
+    if (!this.obsidian) window.removeEventListener('resize', this.handleResize)
     this.$bus.$off('showDownloadTip', this.showDownloadTip)
-    this.mindMap.destroy()
+    this.$bus.$off('data_change', this.onDataChange)
+    this.$bus.$off('view_data_change', this.onViewDataChange)
+    clearTimeout(this.storeConfigTimer)
+    if (this.mindMap) this.mindMap.destroy()
   },
   methods: {
+    loading() {
+      return this.$mindMapLoading || {
+        show: showLoading,
+        hide: hideLoading
+      }
+    },
+
     onLocalStorageExceeded() {
       this.$notify({
         type: 'warning',
@@ -289,53 +320,87 @@ export default {
     },
 
     handleResize() {
-      this.mindMap.resize()
+      if (!this.mindMap) return
+      const rect = this.$refs.mindMapContainer.getBoundingClientRect()
+      if (rect.width > 0 && rect.height > 0) this.mindMap.resize()
     },
 
     // 显示loading
     handleShowLoading() {
       this.enableShowLoading = true
-      showLoading()
+      this.loading().show()
     },
 
     // 渲染结束后关闭loading
     handleHideLoading() {
       if (this.enableShowLoading) {
         this.enableShowLoading = false
-        hideLoading()
+        this.loading().hide()
       }
     },
 
     // 获取思维导图数据，实际应该调接口获取
     getData() {
-      this.mindMapData = getData()
-      this.mindMapConfig = getConfig() || {}
+      const api = getApi(this)
+      this.mindMapData = api.getData()
+      this.mindMapConfig = api.getConfig() || {}
     },
 
     // 存储数据当数据有变时
     bindSaveEvent() {
-      this.$bus.$on('data_change', data => {
-        storeData({ root: data })
-      })
-      this.$bus.$on('view_data_change', data => {
+      this.onDataChange = () => {
+        getApi(this).storeData(this.mindMap.getData(true))
+      }
+      this.onViewDataChange = () => {
         clearTimeout(this.storeConfigTimer)
         this.storeConfigTimer = setTimeout(() => {
-          storeData({
-            view: data
-          })
+          getApi(this).storeData(this.mindMap.getData(true))
         }, 300)
-      })
+      }
+      this.$bus.$on('data_change', this.onDataChange)
+      this.$bus.$on('view_data_change', this.onViewDataChange)
     },
 
     // 手动保存
     manualSave() {
-      storeData(this.mindMap.getData(true))
+      const api = getApi(this)
+      api.storeData(this.mindMap.getData(true))
+      if (this.obsidian && this.$host && typeof this.$host.onSave === 'function') {
+        api.save()
+      }
+    },
+
+    checkEnableShortcut(event) {
+      if (
+        !this.$host ||
+        typeof this.$host.isActive !== 'function' ||
+        !this.$host.isActive()
+      ) {
+        return false
+      }
+      const target = event && event.target
+      if (
+        target !== document.body &&
+        (!target || !this.$el.contains(target))
+      ) {
+        return false
+      }
+      return this.mindMap.keyCommand.defaultEnableCheck(event)
+    },
+
+    checkEnableTextEdit() {
+      return !this.obsidian ||
+        (this.$host &&
+          typeof this.$host.isActive === 'function' &&
+          this.$host.isActive())
     },
 
     // 初始化
     init() {
       let hasFileURL = this.hasFileURL()
-      let { root, layout, theme, view } = this.mindMapData
+      let { root, layout, theme, view } = this.mindMapData || {}
+      theme = theme || exampleData.theme
+      layout = layout || exampleData.layout
       const config = this.mindMapConfig
       // 如果url中存在要打开的文件，那么思维导图数据、主题、布局都使用默认的
       if (hasFileURL) {
@@ -373,9 +438,26 @@ export default {
           openBlankMode: false
         },
         ...(config || {}),
+        ...(this.obsidian
+          ? {
+              el: this.$refs.mindMapContainer,
+              data: root,
+              layout,
+              theme: theme.template,
+              themeConfig: theme.config,
+              viewData: view,
+              customCheckEnableShortcut: this.checkEnableShortcut.bind(this),
+              beforeTextEdit: this.checkEnableTextEdit.bind(this)
+            }
+          : {}),
         iconList: [...icon],
         useLeftKeySelectionRightKeyDrag: this.useLeftKeySelectionRightKeyDrag,
-        customInnerElsAppendTo: null,
+        customInnerElsAppendTo: this.obsidian ? this.$el : null,
+        customHyperlinkJump: this.obsidian ? (link, node) => {
+          if (this.$host && typeof this.$host.onOpenLink === 'function') {
+            this.$host.onOpenLink(link, node)
+          }
+        } : null,
         customHandleClipboardText: handleClipboardText,
         defaultNodeImage: require('../../../assets/img/图片加载失败.svg'),
         initRootNodePosition: ['center', 'center'],
@@ -446,6 +528,8 @@ export default {
           })
         }
       })
+      const api = getApi(this)
+      if (api.setMindMap) api.setMindMap(this.mindMap)
       this.loadPlugins()
       this.mindMap.keyCommand.addShortcut('Control+s', () => {
         this.manualSave()
@@ -455,6 +539,8 @@ export default {
         'node_active',
         'data_change',
         'view_data_change',
+        'layout_change',
+        'view_theme_change',
         'back_forward',
         'node_contextmenu',
         'node_click',
@@ -492,11 +578,12 @@ export default {
       if (hasFileURL) {
         this.$bus.$emit('handle_file_url')
       }
-      // api/index.js文件使用
-      // 当正在编辑本地文件时通过该方法获取最新数据
-      Vue.prototype.getCurrentData = () => {
-        const fullData = this.mindMap.getData(true)
-        return { ...fullData }
+      // 网页版本地文件模式仍使用旧入口的全局读取方法。
+      if (!this.obsidian) {
+        Vue.prototype.getCurrentData = () => {
+          const fullData = this.mindMap.getData(true)
+          return { ...fullData }
+        }
       }
       // 协同测试
       this.cooperateTest()
@@ -510,6 +597,7 @@ export default {
 
     // url中是否存在要打开的文件
     hasFileURL() {
+      if (this.obsidian || !this.$route) return false
       const fileURL = this.$route.query.fileURL
       if (!fileURL) return false
       return /\.(smm|json|xmind|md|xlsx)$/.test(fileURL)
@@ -527,9 +615,13 @@ export default {
         rootNodeData = data
       }
       this.mindMap.view.reset()
-      this.manualSave()
+      if (this.obsidian) {
+        getApi(this).notifyChange()
+      } else {
+        this.manualSave()
+      }
       // 如果导入的是富文本内容，那么自动开启富文本模式
-      if (rootNodeData.data.richText && !this.openNodeRichText) {
+      if (rootNodeData.data && rootNodeData.data.richText && !this.openNodeRichText) {
         this.$bus.$emit('toggleOpenNodeRichText', true)
         this.$notify.info({
           title: this.$t('edit.tip'),
@@ -551,12 +643,12 @@ export default {
     // 导出
     async export(...args) {
       try {
-        showLoading()
+        this.loading().show()
         await this.mindMap.export(...args)
-        hideLoading()
+        this.loading().hide()
       } catch (error) {
         console.log(error)
-        hideLoading()
+        this.loading().hide()
       }
     },
 
@@ -573,7 +665,7 @@ export default {
 
     // 移除节点富文本编辑插件
     removeRichTextPlugin() {
-      this.mindMap.removePlugin(RichText)
+      if (this.mindMap) this.mindMap.removePlugin(RichText)
     },
 
     // 加载滚动条插件
@@ -589,7 +681,12 @@ export default {
 
     // 协同测试
     cooperateTest() {
-      if (this.mindMap.cooperate && this.$route.query.userName) {
+      if (
+        !this.obsidian &&
+        this.mindMap.cooperate &&
+        this.$route &&
+        this.$route.query.userName
+      ) {
         this.mindMap.cooperate.setProvider(null, {
           roomName: 'demo-room',
           signalingList: ['ws://localhost:4444']
@@ -629,6 +726,7 @@ export default {
 
     // 网页版试用提示
     webTip() {
+      if (this.obsidian) return
       const storageKey = 'webUseTip'
       const data = localStorage.getItem(storageKey)
       if (data) {

@@ -32,6 +32,9 @@
         @keydown.native.stop
       ></el-input>
     </div>
+    <div class="pickNote" v-if="$host && $host.onPickNote">
+      <el-button size="mini" @click="pickNote">选择库内笔记</el-button>
+    </div>
     <span slot="footer" class="dialog-footer">
       <el-button @click="cancel">{{ $t('dialog.cancel') }}</el-button>
       <el-button type="primary" @click="confirm">{{
@@ -96,6 +99,13 @@ export default {
 
     handleShowNodeLink() {
       this.dialogVisible = true
+    },
+
+    async pickNote() {
+      const path = await this.$host.onPickNote()
+      if (!path) return
+      this.protocol = 'none'
+      this.link = path
     },
 
     cancel() {

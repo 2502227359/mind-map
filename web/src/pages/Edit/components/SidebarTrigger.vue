@@ -29,6 +29,12 @@ import { sidebarTriggerList } from '@/config'
 
 // 侧边栏触发器
 export default {
+  props: {
+    coreMode: {
+      type: Boolean,
+      default: false
+    }
+  },
   data() {
     return {
       show: true,
@@ -45,6 +51,11 @@ export default {
 
     triggerList() {
       let list = sidebarTriggerList[this.$i18n.locale] || sidebarTriggerList.zh
+      if (this.coreMode) {
+        list = list.filter(item => {
+          return ['nodeStyle', 'baseStyle', 'theme', 'structure'].includes(item.value)
+        })
+      }
       if (this.isReadonly) {
         list = list.filter(item => {
           return ['outline', 'shortcutKey', 'ai'].includes(item.value)

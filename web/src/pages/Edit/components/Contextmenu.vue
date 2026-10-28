@@ -102,7 +102,7 @@
       <div class="item" @click="exec('REMOVE_CUSTOM_STYLES')">
         <span class="name">{{ $t('contextmenu.removeCustomStyles') }}</span>
       </div>
-      <div class="item" @click="exec('EXPORT_CUR_NODE_TO_PNG')">
+      <div class="item" @click="exec('EXPORT_CUR_NODE_TO_PNG')" v-if="!coreMode">
         <span class="name">{{ $t('contextmenu.exportNodeToPng') }}</span>
       </div>
       <div class="splitLine" v-if="enableAi"></div>
@@ -159,7 +159,7 @@
           $t('contextmenu.removeAllNodeCustomStyles')
         }}</span>
       </div>
-      <div class="item">
+      <div class="item" v-if="!coreMode">
         <span class="name">{{ $t('contextmenu.copyToClipboard') }}</span>
         <span class="el-icon-arrow-right"></span>
         <div
@@ -194,6 +194,10 @@ export default {
   props: {
     mindMap: {
       type: Object
+    },
+    coreMode: {
+      type: Boolean,
+      default: false
     }
   },
   data() {

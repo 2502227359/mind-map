@@ -29,7 +29,7 @@
 
 <script>
 import Sidebar from './Sidebar.vue'
-import { storeData } from '@/api'
+import { getApi } from '@/api'
 import { mapState, mapMutations } from 'vuex'
 import themeImgMap from 'simple-mind-map-plugin-themes/themeImgMap'
 import themeList from 'simple-mind-map-plugin-themes/themeList'
@@ -159,6 +159,13 @@ export default {
       const customThemeConfig = this.mindMap.getCustomThemeConfig()
       const hasCustomThemeConfig = Object.keys(customThemeConfig).length > 0
       if (hasCustomThemeConfig) {
+        if (this.$host && this.$host.onConfirm) {
+          this.$host.onConfirm({
+            title: this.$t('theme.tip'), message: this.$t('theme.coverTip'),
+            accept: this.$t('theme.cover'), cancel: this.$t('theme.reserve')
+          }).then(action => this.applyThemeChoice(action, theme, customThemeConfig))
+          return
+        }
         this.$confirm(this.$t('theme.coverTip'), this.$t('theme.tip'), {
           confirmButtonText: this.$t('theme.cover'),
           cancelButtonText: this.$t('theme.reserve'),
@@ -179,10 +186,18 @@ export default {
       }
     },
 
+    applyThemeChoice(action, theme, config) {
+      if (action === 'confirm') {
+        this.mindMap.setThemeConfig({}, true)
+        this.data.theme.config = {}
+        this.changeTheme(theme, {})
+      } else if (action === 'cancel') this.changeTheme(theme, config)
+    },
+
     changeTheme(theme, config) {
       this.$bus.$emit('showLoading')
       this.mindMap.setTheme(theme.value)
-      storeData({
+      getApi(this).storeData({
         theme: {
           template: theme.value,
           config

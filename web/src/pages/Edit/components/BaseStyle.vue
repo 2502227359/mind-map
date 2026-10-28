@@ -792,7 +792,7 @@ import {
   borderDasharrayList
 } from '@/config'
 import ImgUpload from '@/components/ImgUpload/index.vue'
-import { storeData, storeConfig } from '@/api'
+import { getApi } from '@/api'
 import { mapState } from 'vuex'
 import {
   supportLineStyleLayoutsMap,
@@ -1021,7 +1021,7 @@ export default {
       this.data.theme.config[key] = value
       this.$bus.$emit('showLoading')
       this.mindMap.setThemeConfig(this.data.theme.config)
-      storeData({
+      getApi(this).storeData({
         theme: {
           template: this.mindMap.getTheme(),
           config: this.data.theme.config
@@ -1046,7 +1046,7 @@ export default {
       }
       this.configData.rainbowLinesConfig = newConfig
       this.mindMap.rainbowLines.updateRainLinesConfig(newConfig)
-      storeConfig(this.configData)
+      getApi(this).storeConfig(this.configData)
     },
 
     // 更新外框
@@ -1056,7 +1056,7 @@ export default {
       this.mindMap.updateConfig({
         [prop]: value
       })
-      storeConfig(this.configData)
+      getApi(this).storeConfig(this.configData)
       this.mindMap.render()
     },
 
@@ -1068,7 +1068,7 @@ export default {
       }
       this.data.theme.config[this.marginActiveTab][type] = value
       this.mindMap.setThemeConfig(this.data.theme.config)
-      storeData({
+      getApi(this).storeData({
         theme: {
           template: this.mindMap.getTheme(),
           config: this.data.theme.config
