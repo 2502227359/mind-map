@@ -101,6 +101,10 @@ class RichText {
         user-select: none;
       }
 
+      .smm-richtext-node-wrap p {
+        margin: 0;
+      }
+
       .ql-editor .ql-align-left, 
       .smm-richtext-node-wrap .ql-align-left {
         text-align: left;
@@ -356,8 +360,9 @@ class RichText {
   // 删除文本编辑框元素
   removeTextEditEl() {
     if (!this.textEditNode) return
-    const targetNode = this.mindMap.opt.customInnerElsAppendTo || document.body
-    targetNode.removeChild(this.textEditNode)
+    const parent = this.textEditNode.parentNode
+    if (parent) parent.removeChild(this.textEditNode)
+    this.textEditNode = null
   }
 
   // 获取当前正在编辑的内容
@@ -796,6 +801,9 @@ class RichText {
 
   // 将所有节点转换成非富文本节点
   transformAllNodesToNormalNode() {
+    if (this.showTextEdit && this.quill) {
+      this.hideEditText()
+    }
     const renderTree = this.mindMap.renderer.renderTree
     if (!renderTree) return
     walk(
@@ -865,7 +873,12 @@ class RichText {
   // 插件被移除前做的事情
   beforePluginRemove() {
     this.transformAllNodesToNormalNode()
-    document.head.removeChild(this.styleEl)
+    this.removeTextEditEl()
+    this.quill = null
+    if (this.styleEl && this.styleEl.parentNode) {
+      this.styleEl.parentNode.removeChild(this.styleEl)
+    }
+    this.styleEl = null
     this.unbindEvent()
     this.mindMap.removeAppendCss('richText')
     this.mindMap.deleteEditNodeClass(RICH_TEXT_EDIT_WRAP)
@@ -873,7 +886,12 @@ class RichText {
 
   // 插件被卸载前做的事情
   beforePluginDestroy() {
-    document.head.removeChild(this.styleEl)
+    this.removeTextEditEl()
+    this.quill = null
+    if (this.styleEl && this.styleEl.parentNode) {
+      this.styleEl.parentNode.removeChild(this.styleEl)
+    }
+    this.styleEl = null
     this.unbindEvent()
     this.mindMap.deleteEditNodeClass(RICH_TEXT_EDIT_WRAP)
   }

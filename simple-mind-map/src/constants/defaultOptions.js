@@ -198,6 +198,8 @@ export const defaultOpt = {
   createNewNodeBehavior: CONSTANTS.CREATE_NEW_NODE_BEHAVIOR.DEFAULT,
   // 当节点图片加载失败时显示的默认图片
   defaultNodeImage: '',
+  // 将节点图片的持久路径转换成显示地址，不修改导图原始数据。
+  transformImageUrl: null,
   // 是否将思维导图限制在画布内
   // 比如向右拖动时，思维导图图形的最左侧到达画布中心时将无法继续向右拖动，其他同理
   isLimitMindMapInCanvas: false,
