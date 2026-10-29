@@ -1,12 +1,21 @@
 import { Notice, Platform, TFile } from 'obsidian'
 import { formatFileName } from '../reference/ob/utils.js'
+import { createHoverLinkPayload } from './link-hover.js'
 
 // 独立导图与代码块共用宿主能力，文档的读取、保存由各自生命周期负责。
 export function createEditorApi({ app, plugin, getFile, assetStore, saveFileToVault, documentApi }) {
+  const hoverParent = { hoverPopover: null }
   const findFile = path => app.vault.getFileByPath(path)
     || app.vault.getFileByPath(path + '.md')
     || app.metadataCache.getFirstLinkpathDest(path, getFile()?.path || '')
   return {
+      showFilePreview: (event, targetEl, linktext) => {
+        app.workspace.trigger('hover-link', {
+          ...createHoverLinkPayload({ event, targetEl, linktext, sourcePath: getFile()?.path || '' }),
+          source: 'personal-mindmap',
+          hoverParent
+        })
+      },
       getMindMapConfig: () => {
         return plugin.settings.mindMapConfig || {}
       },

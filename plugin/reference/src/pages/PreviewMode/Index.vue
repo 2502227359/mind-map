@@ -1,6 +1,7 @@
 <template>
   <div
     class="smmPreviewModeContainer"
+    :class="{ tabPreview: $root.$obsidianAPI.getIsTabPreview?.() }"
     ref="smmPreviewModeContainerRef"
     @click.stop
   >
@@ -85,6 +86,7 @@ export default {
   },
   mounted() {
     this.$root.$bus.$on('unmount', this.unmount)
+    this.$root.$bus.$on('windowResize', this.handleResize)
     this.getData()
     if (!this.mindMapData) {
       this.isEmpty = true
@@ -101,6 +103,7 @@ export default {
 
     unmount() {
       this.$root.$bus.$off('unmount', this.unmount)
+      this.$root.$bus.$off('windowResize', this.handleResize)
       if (this.mindMap) {
         this.mindMap.destroy()
         this.mindMap = null
@@ -124,7 +127,11 @@ export default {
     handleResize() {
       clearTimeout(this.resizeTimer)
       this.resizeTimer = setTimeout(() => {
-        this.mindMap.resize()
+        if (this._isDestroyed) return
+        const rect = this.$refs.smmContainerRef?.getBoundingClientRect()
+        if (!rect || rect.width <= 0 || rect.height <= 0) return
+        if (this.mindMap) this.mindMap.resize()
+        else if (this.mindMapData) this.initMindMap()
       }, 300)
     },
 
@@ -134,6 +141,7 @@ export default {
 
     initMindMap() {
       this.$nextTick(() => {
+        if (this._isDestroyed || this.mindMap) return
         const rect = this.$refs.smmContainerRef.getBoundingClientRect()
         if (rect.width <= 0 || rect.height <= 0) return
         let { root, layout, theme, view } = this.mindMapData
@@ -217,6 +225,7 @@ export default {
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
+  &.tabPreview { width: 100%; height: 100%; }
 
   &:hover {
     .topToolbar {

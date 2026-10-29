@@ -3,7 +3,7 @@
     <div
       v-for="item in list"
       :key="item"
-      :aria-label="iconNameMap[item]"
+      :aria-label="iconNameMap[item] || item"
       :data-tooltip-position="dir === 'v' ? 'left' : 'bottom'"
     >
       <div
@@ -188,6 +188,26 @@
           style="font-size: 22px;"
         ></span>
       </div>
+      <div
+        v-if="item === 'annotation'"
+        class="toolbarBtn"
+        :class="{
+          disabled: readonly || activeNodes.length <= 0
+        }"
+        @click="$root.$bus.$emit('showNodeNotation', activeNodes)"
+      >
+        <span class="icon iconfont iconxingzhuang-wenzi"></span>
+      </div>
+      <div
+        v-if="item === 'chatDialog'"
+        class="toolbarBtn"
+        :class="{
+          disabled: readonly || activeNodes.length <= 0
+        }"
+        @click="$root.$bus.$emit('showNodeCallout', activeNodes)"
+      >
+        <span class="icon el-icon-chat-dot-round"></span>
+      </div>
     </div>
   </div>
 </template>
@@ -239,7 +259,7 @@ export default {
       )
     },
     iconNameMap() {
-      return iconNameMap[this.$i18n.locale] || iconNameMap.en
+      return { ...(iconNameMap[this.$i18n.locale] || iconNameMap.en), annotation: '圈画标记', chatDialog: '标注气泡' }
     }
   },
   created() {

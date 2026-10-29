@@ -80,19 +80,20 @@
       :class="{ isDark: isDark }"
       title="节点跳转"
       :visible.sync="nodeLinkDialogVisible"
+      @open="$nextTick(() => $refs.nodeLinkSelect && $refs.nodeLinkSelect.refresh())"
       width="420px"
       :modal-append-to-body="false"
       :close-on-click-modal="false"
       @close="cancelNodeLinkDialog"
     >
-      <div class="featureDialogHint">填写目标节点 UID，可从节点数据或复制的 JSON 中获取。</div>
-      <el-input
+      <div class="featureDialogHint">从主结构、游离树或折叠节点中选择目标。</div>
+      <NodeLinkSelect
+        ref="nodeLinkSelect"
         v-model="nodeLinkTargetUid"
-        size="small"
-        placeholder="目标节点 UID"
-        @keyup.native.stop
-        @keydown.native.stop
-      ></el-input>
+        :mind-map="mindMap"
+        :exclude-uid="node ? String(node.uid) : ''"
+        :is-dark="isDark"
+      ></NodeLinkSelect>
       <el-checkbox v-model="nodeLinkBidirectional">同时建立反向跳转</el-checkbox>
       <span slot="footer" class="dialog-footer">
         <el-button size="small" @click="cancelNodeLinkDialog">取消</el-button>
@@ -152,7 +153,12 @@
 </template>
 
 <script>
+import NodeLinkSelect from './NodeLinkSelect.vue'
+
 export default {
+  components: {
+    NodeLinkSelect
+  },
   props: {
     mindMap: {
       type: Object,
@@ -332,6 +338,14 @@ export default {
 
     confirmNodeLinkDialog() {
       const targetUid = String(this.nodeLinkTargetUid || '').trim()
+      if (!targetUid) {
+        this.showTip('请选择目标节点')
+        return
+      }
+      if (this.node && String(this.node.uid) === targetUid) {
+        this.showTip('不能跳转到当前节点')
+        return
+      }
       const renderer = this.mindMap && this.mindMap.renderer
       const target =
         renderer && typeof renderer.findNodeByUid === 'function'
@@ -344,7 +358,7 @@ export default {
           ? this.mindMap.nodeLink.findNodeData(targetUid)
           : null
       if (!target && !targetData) {
-        this.showTip('未找到目标节点，请检查 UID')
+        this.showTip('未找到目标节点，请刷新后重新选择')
         return
       }
       this.runNodeCommand(

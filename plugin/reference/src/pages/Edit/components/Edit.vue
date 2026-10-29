@@ -1,5 +1,14 @@
 <template>
   <div ref="editContainer" class="editContainer" v-loading="loading">
+    <div v-if="focusLabel || blankActive" class="smmModeBanner">
+      <span v-if="focusLabel">聚焦：{{ focusLabel }}</span>
+      <el-button v-if="focusLabel" :disabled="modeSwitching" size="mini" @click="exitFocus().catch(reportModeError)">返回完整导图</el-button>
+      <template v-if="blankActive">
+        <span>填空模式：点击节点逐个显示下划线答案</span>
+        <el-button size="mini" @click="blankMode.restart()">重新开始</el-button>
+        <el-button size="mini" @click="toggleBlankMode">退出填空</el-button>
+      </template>
+    </div>
     <div
       class="mindMapContainer"
       id="mindMapContainer"
@@ -46,6 +55,7 @@
     <FormulaSidebar v-if="mindMap" :mindMap="mindMap"></FormulaSidebar>
     <NodeOuterFrame v-if="mindMap" :mindMap="mindMap"></NodeOuterFrame>
     <NodeTagStyle v-if="mindMap" :mindMap="mindMap"></NodeTagStyle>
+    <NodeChatDialog v-if="mindMap" :mindMap="mindMap"></NodeChatDialog>
     <Setting
       v-if="mindMap"
       :configData="mindMapConfig"
@@ -193,6 +203,8 @@ import NodeTagFilterList from './NodeTagFilterList.vue'
 import RainbowRefreshBtn from './RainbowRefreshBtn.vue'
 import { imgFail, obFileHyperlinkIcon, hyperlinkIcon } from '@/config/icons'
 import imgHostingUpload from '@/mixins/imgHostingUpload'
+import editorModes from '@/mixins/editorModes'
+import NodeChatDialog from './NodeChatDialog.vue'
 
 // 引擎和节点持有 SVG PathArray 等对象，Vue 深度观察会改写其数组原型。
 // UI 仍通过现有事件和独立配置对象刷新，不观察图形运行时内部状态。
@@ -237,8 +249,9 @@ MindMap.usePlugin(MiniMap)
 Themes.init(MindMap)
 
 export default {
-  mixins: [imgHostingUpload],
+  mixins: [imgHostingUpload, editorModes],
   components: {
+    NodeChatDialog,
     OutlineSidebar,
     Style,
     BaseStyle,
@@ -384,6 +397,10 @@ export default {
   methods: {
     onToggleReadonly(isReadonly) {
       if (this.mindMap) {
+        if (this.blankMode) {
+          this.blankMode.readonly = isReadonly
+          return
+        }
         this.mindMap.setMode(isReadonly ? 'readonly' : 'edit')
       }
     },
@@ -698,6 +715,7 @@ export default {
     },
 
     afterInitMindMap(mindMap) {
+      this.setupModes(mindMap)
       mindMap.on('node_tree_render_end', this.onFirstNodeTreeRenderEnd)
 
       this.loadPlugins(mindMap)
@@ -746,6 +764,7 @@ export default {
 
     closeEditTextBox() {
       if (!this.mindMap) return false
+      this.mindMap.chatDialog?.hideInlineEditor(true)
       this.mindMap.renderer.textEdit.hideEditTextBox()
       if (this.mindMap.associativeLine) {
         this.mindMap.associativeLine.hideEditTextBox()
@@ -822,6 +841,7 @@ export default {
     },
 
     setData(data) {
+      this.resetModes()
       this.handleShowLoading()
       if (data.root) {
         this.mindMapData = data
@@ -842,6 +862,7 @@ export default {
 
     onUpdateMindMapDataFromOb(data, ignoreLayoutAndTheme = false) {
       try {
+        this.resetModes()
         this.isNotTriggerDataChange = true
         data = JSON.parse(data)
         this.mindMap.updateData(data.root)
@@ -891,6 +912,7 @@ export default {
 
     bindSaveEvent() {
       this.$root.$bus.$on('data_change', data => {
+        if (this.modeSwitching) return
         if (this.isNotTriggerDataChange) {
           this.isNotTriggerDataChange = false
           return
@@ -900,7 +922,7 @@ export default {
         } else {
           this.isFirst = false
         }
-        this.updateMindMapData({ root: data }, false)
+        this.updateMindMapData(this.focusSession ? this.currentDocument() : { root: data }, false)
       })
       this.$root.$bus.$on('view_data_change', data => {
         clearTimeout(this.storeConfigTimer)
@@ -936,9 +958,8 @@ export default {
       this.savingTimer = setTimeout(async () => {
         try {
           this.isSaving = true
-          const data = this.includeRainbowLinesConfig(
-            this.mindMap.getData(true)
-          )
+          if (getSvg && this.focusSession) await this.exitFocus()
+          const data = this.currentDocument()
           if (!data.root) {
             this.$root.$obsidianAPI.showTip(this.$t('edit.savingTip2'))
             this.isSaving = false
@@ -982,9 +1003,7 @@ export default {
           if (typeof resolve === 'function') resolve(null)
           return null
         }
-        const data = this.includeRainbowLinesConfig(
-          this.mindMap.getData(true)
-        )
+        const data = this.currentDocument()
         if (!data || !data.root) {
           this.$root.$obsidianAPI.showTip(this.$t('edit.savingTip2'))
           if (typeof resolve === 'function') resolve(null)
@@ -1021,6 +1040,7 @@ export default {
 
     async export(...args) {
       try {
+        if (this.focusSession) await this.exitFocus()
         this.showLoading()
         await this.mindMap.export(...args)
         this.hideLoading()
@@ -1194,6 +1214,23 @@ export default {
 </script>
 
 <style lang="less" scoped>
+.smmModeBanner {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  max-width: 90%;
+  padding: 6px 10px;
+  background: var(--background-primary, white);
+  color: var(--text-normal, #333);
+  box-shadow: 0 2px 8px #0002;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  span { max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
 .editContainer {
   position: absolute;
   width: 100%;

@@ -57,7 +57,9 @@ const defaultBtnList = [
   'summary',
   'associativeLine',
   'formula',
-  'outerFrame'
+  'outerFrame',
+  'annotation',
+  'chatDialog'
 ]
 
 export default {

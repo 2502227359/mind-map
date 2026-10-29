@@ -84,6 +84,10 @@ export default {
   },
   methods: {
     onEnterDemonstrate() {
+      if (this.$root.$isMapStudyMode?.()) {
+        this.$root.$obsidianAPI.showTip('请先退出填空或聚焦模式，再进入演示')
+        return
+      }
       this.enterDemoModeTimer = setTimeout(() => {
         this.mindMap.resize()
         this.mindMap.demonstrate.jump(0)

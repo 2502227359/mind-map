@@ -290,7 +290,7 @@ export const downloadFile = (file, fileName) => {
 //  节流函数
 export const throttle = (fn, time = 300, ctx) => {
   let timer = null
-  return (...args) => {
+  const run = (...args) => {
     if (timer) {
       return
     }
@@ -299,6 +299,8 @@ export const throttle = (fn, time = 300, ctx) => {
       timer = null
     }, time)
   }
+  run.cancel = () => { clearTimeout(timer); timer = null }
+  return run
 }
 
 // 防抖函数

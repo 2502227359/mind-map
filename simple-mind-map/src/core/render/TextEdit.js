@@ -31,6 +31,8 @@ export default class TextEdit {
     this.textEditNode = null
     // 文本编辑框是否显示
     this.showTextEdit = false
+    // 当前编辑正文还是节点描述。描述复用同一个原位编辑框，但保存命令不同。
+    this.otherEditType = ''
     // 如果编辑过程中缩放画布了，那么缓存当前编辑的内容
     this.cacheEditingText = ''
     this.hasBodyMousedown = false
@@ -44,12 +46,15 @@ export default class TextEdit {
   //  事件
   bindEvent() {
     this.show = this.show.bind(this)
+    this.onNodeDescDblclick = this.onNodeDescDblclick.bind(this)
     this.onScale = this.onScale.bind(this)
     this.onKeydown = this.onKeydown.bind(this)
     // 节点双击事件
     this.mindMap.on('node_dblclick', (node, e, isInserting) => {
       this.show({ node, e, isInserting })
     })
+    // 节点描述双击时使用同一个文本编辑框，避免弹窗编辑造成位置跳变。
+    this.mindMap.on('node_desc_dblclick', this.onNodeDescDblclick)
     // 点击事件
     this.mindMap.on('draw_click', () => {
       // 隐藏文本编辑框
@@ -146,6 +151,11 @@ export default class TextEdit {
   // 解绑事件
   unBindEvent() {
     window.removeEventListener('keydown', this.onKeydown)
+    this.mindMap.off('node_desc_dblclick', this.onNodeDescDblclick)
+  }
+
+  onNodeDescDblclick(node, e, isInserting = false) {
+    this.show({ node, e, isInserting, editType: 'nodeDesc' })
   }
 
   // 按键事件
@@ -191,6 +201,7 @@ export default class TextEdit {
 
   // 获取当前文本编辑框是否处于显示状态，也就是是否处在文本编辑状态
   isShowTextEdit() {
+    if (this.isDescEdit()) return this.showTextEdit
     if (this.mindMap.richText) {
       return this.mindMap.richText.showTextEdit
     }
@@ -214,8 +225,10 @@ export default class TextEdit {
     node,
     isInserting = false,
     isFromKeyDown = false,
-    isFromScale = false
+    isFromScale = false,
+    editType = 'text'
   }) {
+    if (this.mindMap.opt.readonly) return
     // 使用了自定义节点内容那么不响应编辑事件
     if (node.isUseCustomNodeContent()) {
       return
@@ -225,6 +238,7 @@ export default class TextEdit {
     if (currentEditNode) {
       this.hideEditTextBox()
     }
+    this.otherEditType = editType
     const { beforeTextEdit, openRealtimeRenderOnNodeTextEdit } =
       this.mindMap.opt
     if (typeof beforeTextEdit === 'function') {
@@ -239,7 +253,12 @@ export default class TextEdit {
     }
     const { offsetLeft, offsetTop } = checkNodeOuter(this.mindMap, node)
     this.mindMap.view.translateXY(offsetLeft, offsetTop)
-    const g = node._textData.node
+    const contentData = this.isDescEdit() ? node._descData : node._textData
+    if (!contentData || !contentData.node) {
+      this.otherEditType = ''
+      return
+    }
+    const g = contentData.node
     // 需要先显示，不然宽高获取到的可能是0
     if (openRealtimeRenderOnNodeTextEdit) {
       g.show()
@@ -256,12 +275,16 @@ export default class TextEdit {
       isFromKeyDown,
       isFromScale
     }
-    if (this.mindMap.richText) {
+    if (this.mindMap.richText && !this.isDescEdit()) {
       this.mindMap.richText.showEditText(params)
       return
     }
     this.currentNode = node
-    this.showEditTextBox(params)
+    this.showEditTextBox({ ...params, isDescEdit: this.isDescEdit() })
+  }
+
+  isDescEdit() {
+    return this.otherEditType === 'nodeDesc'
   }
 
   // 当openRealtimeRenderOnNodeTextEdit配置更新后需要更新编辑框样式
@@ -283,7 +306,7 @@ export default class TextEdit {
   onScale() {
     const node = this.getCurrentEditNode()
     if (!node) return
-    if (this.mindMap.richText) {
+    if (this.mindMap.richText && !this.isDescEdit()) {
       this.mindMap.richText.cacheEditingText =
         this.mindMap.richText.getEditText()
       this.mindMap.richText.showTextEdit = false
@@ -293,12 +316,20 @@ export default class TextEdit {
     }
     this.show({
       node,
-      isFromScale: true
+      isFromScale: true,
+      editType: this.otherEditType
     })
   }
 
   //  显示文本编辑框
-  showEditTextBox({ node, rect, isInserting, isFromKeyDown, isFromScale }) {
+  showEditTextBox({
+    node,
+    rect,
+    isInserting,
+    isFromKeyDown,
+    isFromScale,
+    isDescEdit = false
+  }) {
     if (this.showTextEdit) return
     const {
       nodeTextEditZIndex,
@@ -369,14 +400,25 @@ export default class TextEdit {
     const maxCanvasHeight =
       this.mindMap.height - 2 * textEditHeightOverflowCanvasHeightMarginY
     const isHeightOverflow = rect.height > maxCanvasHeight
-    const fontSize = node.style.merge('fontSize')
-    const textLines = (this.cacheEditingText || node.getData('text'))
+    const descStyle = isDescEdit ? node.getData('descStyle') || {} : {}
+    const fontSize = isDescEdit
+      ? Number(descStyle.fontSize) || Number(node.style.merge('fontSize')) * 0.8
+      : node.style.merge('fontSize')
+    const editText = isDescEdit ? node.getData('desc') || '' : node.getData('text')
+    const textLines = (this.cacheEditingText || editText)
       .split(/\n/gim)
       .map(item => {
         return htmlEscape(item)
       })
-    const isMultiLine = node._textData.node.attr('data-ismultiLine') === 'true'
+    const contentData = isDescEdit ? node._descData : node._textData
+    const isMultiLine = contentData.node.attr('data-ismultiLine') === 'true'
     node.style.domText(this.textEditNode, scale)
+    if (isDescEdit) {
+      this.textEditNode.style.color = descStyle.color || '#888'
+      this.textEditNode.style.fontSize = fontSize * scale + 'px'
+      this.textEditNode.style.fontStyle = descStyle.fontStyle || 'italic'
+      this.textEditNode.style.fontWeight = descStyle.fontWeight || 'normal'
+    }
     if (!openRealtimeRenderOnNodeTextEdit) {
       this.textEditNode.style.background = this.getBackground(node)
     }
@@ -438,6 +480,13 @@ export default class TextEdit {
 
   // 派发节点文本编辑事件
   emitTextChangeEvent() {
+    if (this.isDescEdit()) {
+      this.mindMap.emit('node_desc_edit_change', {
+        node: this.currentNode,
+        text: this.getEditText()
+      })
+      return
+    }
     this.mindMap.emit('node_text_edit_change', {
       node: this.currentNode,
       text: this.getEditText(),
@@ -447,14 +496,18 @@ export default class TextEdit {
 
   // 更新文本编辑框的大小和位置
   updateTextEditNode() {
-    if (this.mindMap.richText) {
+    if (this.mindMap.richText && !this.isDescEdit()) {
       this.mindMap.richText.updateTextEditNode()
       return
     }
     if (!this.showTextEdit || !this.currentNode) {
       return
     }
-    const rect = this.currentNode._textData.node.node.getBoundingClientRect()
+    const contentData = this.isDescEdit()
+      ? this.currentNode._descData
+      : this.currentNode._textData
+    if (!contentData || !contentData.node) return
+    const rect = contentData.node.node.getBoundingClientRect()
     const {
       textEditHeightOverflowCanvasHeightMarginY,
       handleTextEditHeightOverflowCanvasHeightTop
@@ -527,7 +580,7 @@ export default class TextEdit {
 
   //  隐藏文本编辑框
   hideEditTextBox() {
-    if (this.mindMap.richText) {
+    if (this.mindMap.richText && !this.isDescEdit()) {
       return this.mindMap.richText.hideEditText()
     }
     if (!this.showTextEdit) {
@@ -543,7 +596,8 @@ export default class TextEdit {
     this.textEditNode.style.fontWeight = 'normal'
     this.textEditNode.style.transform = 'translateY(0)'
     this.setIsShowTextEdit(false)
-    this.mindMap.execCommand('SET_NODE_TEXT', currentNode, text)
+    const command = this.isDescEdit() ? 'SET_NODE_DESC' : 'SET_NODE_TEXT'
+    this.mindMap.execCommand(command, currentNode, text)
     // if (currentNode.isGeneralization) {
     //   // 概要节点
     //   currentNode.generalizationBelongNode.updateGeneralization()
@@ -555,10 +609,12 @@ export default class TextEdit {
       this.renderer.activeNodeList,
       currentNode
     )
+    this.otherEditType = ''
   }
 
   // 获取当前正在编辑中的节点实例
   getCurrentEditNode() {
+    if (this.isDescEdit()) return this.currentNode
     if (this.mindMap.richText) {
       return this.mindMap.richText.node
     }

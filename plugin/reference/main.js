@@ -44,6 +44,7 @@ import LZString from 'lz-string'
 import { SuggestionModal } from './ob/SuggestionModal.js'
 import { registerCodeBlocks } from '../src/code-blocks.js'
 import { parseDocument } from '../src/document/format.js'
+import { MarkdownMapPreviewView, MARKDOWN_MAP_PREVIEW } from '../src/markdown-preview-view.js'
 
 export default class SimpleMindMapPlugin extends Plugin {
   async onload() {
@@ -63,6 +64,8 @@ export default class SimpleMindMapPlugin extends Plugin {
     addIcon('smm-icon', SIDE_BAR_ICON)
 
     this.registerView(SMM_VIEW_TYPE, leaf => new SmmEditView(leaf, this))
+    this.registerView(MARKDOWN_MAP_PREVIEW, leaf => new MarkdownMapPreviewView(leaf, this))
+    this.registerHoverLinkSource('personal-mindmap', { display: '个人思维导图内链', defaultMod: false })
 
     this._createSmmFile = this._createSmmFile.bind(this)
     this.addRibbonIcon(

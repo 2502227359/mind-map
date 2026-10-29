@@ -1,4 +1,5 @@
 import { Notice, MarkdownView } from 'obsidian'
+import { openMarkdownMapPreview } from '../../src/markdown-preview-view.js'
 
 export default class Commands {
   constructor(plugin) {
@@ -60,6 +61,16 @@ export default class Commands {
   }
 
   _addActionsCommand() {
+    ;[false, true].forEach(split => this.addCommand({
+      id: split ? 'preview-markdown-map-split' : 'preview-markdown-map-tab',
+      name: split ? '在分屏中预览 Markdown 思维导图' : '在新标签页预览 Markdown 思维导图',
+      checkCallback: checking => {
+        const file = this.app.workspace.getActiveViewOfType(MarkdownView)?.file
+        if (!file || this.plugin._isSmmFile(file)) return false
+        if (!checking) openMarkdownMapPreview(this.plugin, file, split)
+        return true
+      }
+    }))
     this.addCommand({
       id: 'preview-markdown-as-mindmap',
       name: this._t('action.previewAsMindMap'),

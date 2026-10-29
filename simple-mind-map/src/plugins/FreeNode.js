@@ -49,14 +49,17 @@ class FreeNode {
   }
 
   setLayout(nodes, layout) {
-    if (this.mindMap.opt.readonly || !layoutValueList.includes(layout)) return
+    if (this.mindMap.opt.readonly || (layout != null && !layoutValueList.includes(layout))) return
     const renderer = this.mindMap.renderer
     const roots = new Set((nodes?.length ? nodes : renderer.activeNodeList).map(node => {
       while (node.parent) node = node.parent
       return node
     }))
     roots.forEach(root => {
-      if (root !== renderer.root) root.nodeData.data.layout = layout
+      if (root !== renderer.root) {
+        if (layout == null) delete root.nodeData.data.layout
+        else root.nodeData.data.layout = layout
+      }
     })
     this.mindMap.render(null, CONSTANTS.CHANGE_LAYOUT)
   }

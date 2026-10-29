@@ -22,6 +22,40 @@
         </div>
       </div>
     </div>
+    <el-dialog
+      class="freeLayoutDialog smmElDialog"
+      :class="{ isDark: isDark }"
+      title="游离树布局"
+      :visible.sync="freeLayoutDialogVisible"
+      width="360px"
+      :modal-append-to-body="false"
+      :close-on-click-modal="false"
+    >
+      <div class="freeLayoutHint">
+        当前选中的是游离树。可单独设置布局，也可以跟随主结构布局。
+      </div>
+      <el-radio-group v-model="freeLayoutMode">
+        <el-radio label="layout">独立布局</el-radio>
+        <el-radio label="main">跟随主结构</el-radio>
+      </el-radio-group>
+      <el-select
+        v-if="freeLayoutMode === 'layout'"
+        v-model="pendingFreeLayout"
+        size="small"
+        style="width: 100%; margin-top: 14px;"
+      >
+        <el-option
+          v-for="item in freeLayoutOptions"
+          :key="item.value"
+          :label="item.label"
+          :value="item.value"
+        ></el-option>
+      </el-select>
+      <span slot="footer" class="dialog-footer">
+        <el-button size="small" @click="freeLayoutDialogVisible = false">取消</el-button>
+        <el-button size="small" type="primary" @click="confirmFreeLayout">确定</el-button>
+      </span>
+    </el-dialog>
   </Sidebar>
 </template>
 
@@ -43,8 +77,28 @@ export default {
   data() {
     return {
       layoutImgMap,
-      layoutNames: { rightFishbone: '右鱼骨', rightFishbone2: '右鱼骨 2', table: '表格' },
-      layout: ''
+      layoutNames: {
+        logicalStructure: '逻辑结构图',
+        logicalStructureLeft: '逻辑结构图（左）',
+        mindMap: '思维导图',
+        organizationStructure: '组织结构图',
+        catalogOrganization: '目录组织图',
+        timeline: '时间轴',
+        timeline2: '时间轴 2',
+        verticalTimeline: '垂直时间轴',
+        verticalTimeline2: '垂直时间轴 2',
+        verticalTimeline3: '垂直时间轴 3',
+        fishbone: '鱼骨图',
+        fishbone2: '鱼骨图 2',
+        rightFishbone: '右鱼骨',
+        rightFishbone2: '右鱼骨 2',
+        table: '表格'
+      },
+      layout: '',
+      freeLayoutDialogVisible: false,
+      freeLayoutMode: 'layout',
+      pendingFreeLayout: '',
+      freeSelectedNodes: []
     }
   },
   computed: {
@@ -62,6 +116,18 @@ export default {
         }
       })
       return [...groups, { name: '表格', list: ['table'] }]
+    },
+
+    freeLayoutOptions() {
+      const options = []
+      this.layoutGroupList.forEach(group => {
+        group.list.forEach(value => {
+          if (!options.some(item => item.value === value)) {
+            options.push({ value, label: this.layoutNames[value] || value })
+          }
+        })
+      })
+      return options
     }
   },
   watch: {
@@ -78,15 +144,48 @@ export default {
       }
     }
   },
+  mounted() {
+    this.$root.$bus.$on('show_change_freenodetree_layout', this.openFreeLayout)
+  },
+  beforeDestroy() {
+    this.$root.$bus.$off('show_change_freenodetree_layout', this.openFreeLayout)
+  },
   methods: {
-    useLayout(layout) {
-      const selected = this.mindMap.renderer.activeNodeList
-      if (selected.length && selected.some(node => {
+    openFreeLayout(nodes) {
+      if (this.mindMap.opt.readonly) return
+      const free = (nodes || []).filter(node => {
+        if (!node) return false
         while (node.parent) node = node.parent
         return node !== this.mindMap.renderer.root
-      })) {
-        this.mindMap.execCommand('SET_FREE_NODE_TREE_LAYOUT', selected, layout)
-        this.layout = layout
+      })
+      if (!free.length) {
+        this.$root.$obsidianAPI.showTip('请选择游离树中的节点')
+        return
+      }
+      this.freeSelectedNodes = free
+      let root = free[0]
+      while (root.parent) root = root.parent
+      this.pendingFreeLayout = root.getData('layout') || this.mindMap.getLayout()
+      this.freeLayoutMode = root.getData('layout') ? 'layout' : 'main'
+      this.freeLayoutDialogVisible = true
+    },
+    getSelectedFreeNodes() {
+      const renderer = this.mindMap && this.mindMap.renderer
+      const root = renderer && renderer.root
+      return (renderer && renderer.activeNodeList ? renderer.activeNodeList : []).filter(node => {
+        let current = node
+        while (current && current.parent) current = current.parent
+        return current && current !== root
+      })
+    },
+
+    useLayout(layout) {
+      const selectedFreeNodes = this.getSelectedFreeNodes()
+      if (selectedFreeNodes.length) {
+        this.freeSelectedNodes = selectedFreeNodes
+        this.pendingFreeLayout = layout
+        this.freeLayoutMode = 'layout'
+        this.freeLayoutDialogVisible = true
         return
       }
       this.layout = layout
@@ -94,6 +193,22 @@ export default {
       this.$root.$bus.$emit('storeData', {
         layout
       })
+    },
+
+    confirmFreeLayout() {
+      if (!this.freeSelectedNodes.length) {
+        this.freeLayoutDialogVisible = false
+        return
+      }
+      const layout = this.freeLayoutMode === 'main' ? null : this.pendingFreeLayout
+      this.mindMap.execCommand(
+        'SET_FREE_NODE_TREE_LAYOUT',
+        this.freeSelectedNodes,
+        layout
+      )
+      this.layout = layout || this.mindMap.getLayout()
+      this.freeLayoutDialogVisible = false
+      this.freeSelectedNodes = []
     }
   }
 }
@@ -160,6 +275,18 @@ export default {
         }
       }
     }
+  }
+}
+
+.freeLayoutDialog {
+  .freeLayoutHint {
+    margin-bottom: 14px;
+    color: #606266;
+    line-height: 1.6;
+  }
+
+  &.isDark .freeLayoutHint {
+    color: hsla(0, 0%, 100%, 0.65);
   }
 }
 </style>

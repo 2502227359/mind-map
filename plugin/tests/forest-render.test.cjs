@@ -65,6 +65,11 @@ test('游离根的新建与独立布局写入权威树且保留零坐标', async
   const node = { nodeData: free }
   commands.get('SET_FREE_NODE_TREE_LAYOUT')([node], 'timeline')
   assert.equal(free.data.layout, 'timeline')
+    commands.get('SET_FREE_NODE_TREE_LAYOUT')([node], null)
+    assert.equal(Object.hasOwn(free.data, 'layout'), false)
+    mindMap.opt.readonly = true
+    commands.get('SET_FREE_NODE_TREE_LAYOUT')([node], 'timeline')
+    assert.equal(Object.hasOwn(free.data, 'layout'), false)
   plugin.beforePluginDestroy()
   assert.equal(commands.size, 0)
 })

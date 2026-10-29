@@ -3,10 +3,14 @@
     class="contextmenuContainer contextmenuListBox smmCustomScrollbar"
     v-if="isShow"
     ref="contextmenuRef"
+    @mouseover="onMenuOver"
+    @scroll.capture="onMenuScroll"
     :style="styleObj"
     :class="{ isDark: isDark, isMobile: isMobile }"
   >
     <template v-if="type === 'node'">
+      <div class="item" v-if="!isGeneralization && node !== mindMap.renderer.root" @click="enterNodeFocus"><span class="name">进入此节点（聚焦子树）</span></div>
+      <div class="item" @click="changeFreeLayout"><span class="name">游离树布局设置</span></div>
       <div class="item">
         <span class="name">{{ $t('contextmenu.insertNode') }}</span>
         <span class="el-icon-arrow-right"></span>
@@ -14,7 +18,6 @@
           class="subItems listBox"
           :class="{ isDark: isDark }"
           style="width: 200px; top: -10px;"
-          :style="{ left: subItemsShowLeft ? '-200px' : '100%' }"
         >
           <div
             class="item"
@@ -84,7 +87,7 @@
         <span class="el-icon-arrow-right"></span>
         <div
           class="subItems listBox"
-          :class="{ isDark: isDark, showLeft: subItemsShowLeft }"
+          :class="{ isDark: isDark }"
           style="top: -10px"
         >
           <div class="item" @click="selectNodes('brother')">同层级所有节点</div>
@@ -99,7 +102,7 @@
         </div>
         <div
           class="subItems contextmenuListBox featureMenu"
-          :class="{ isDark: isDark, showLeft: subItemsShowLeft }"
+          :class="{ isDark: isDark }"
           style="top: -10px"
         >
           <div class="item" @click="toggleTodo">
@@ -118,7 +121,7 @@
             </div>
             <div
               class="subItems contextmenuListBox featureMenu"
-              :class="{ isDark: isDark, showLeft: subItemsShowLeft }"
+              :class="{ isDark: isDark }"
               style="top: -10px"
             >
               <div class="item" @click="setChildrenTodo('add')">添加待办</div>
@@ -140,7 +143,7 @@
             </div>
             <div
               class="subItems contextmenuListBox featureMenu numberMenu"
-              :class="{ isDark: isDark, showLeft: subItemsShowLeft }"
+              :class="{ isDark: isDark }"
               style="top: -10px"
             >
               <div
@@ -158,7 +161,7 @@
                 </div>
                 <div
                   class="subItems contextmenuListBox featureMenu"
-                  :class="{ isDark: isDark, showLeft: subItemsShowLeft }"
+                  :class="{ isDark: isDark }"
                   style="top: -10px"
                 >
                   <div
@@ -180,7 +183,7 @@
             </div>
             <div
               class="subItems contextmenuListBox featureMenu numberMenu"
-              :class="{ isDark: isDark, showLeft: subItemsShowLeft }"
+              :class="{ isDark: isDark }"
               style="top: -10px"
             >
               <div
@@ -212,7 +215,7 @@
             </div>
             <div
               class="subItems contextmenuListBox featureMenu"
-              :class="{ isDark: isDark, showLeft: subItemsShowLeft }"
+              :class="{ isDark: isDark }"
               style="top: -10px"
             >
               <div class="item" @click="openNotationDialog">添加/编辑圈画</div>
@@ -264,7 +267,7 @@
         <span class="el-icon-arrow-right"></span>
         <div
           class="subItems listBox"
-          :class="{ isDark: isDark, showLeft: subItemsShowLeft }"
+          :class="{ isDark: isDark }"
           style="top: -10px"
         >
           <div
@@ -316,7 +319,7 @@
         </div>
         <div
           class="subItems contextmenuListBox"
-          :class="{ isDark: isDark, showLeft: subItemsShowLeft }"
+          :class="{ isDark: isDark }"
           style="top: -17px"
         >
           <div class="item" @click="copyCurNodeAsPng">
@@ -334,6 +337,7 @@
         <span class="name">{{ $t('contextmenu.copyAsInternalUrl') }}</span>
       </div>
     </template>
+    <div class="item" @click="toggleBlank"><span class="name">进入 / 退出填空模式</span></div>
     <template v-if="type === 'svg'">
       <div class="item" @click="exec('RETURN_CENTER')">
         <span class="name">{{ $t('contextmenu.backCenter') }}</span>
@@ -356,7 +360,7 @@
         </div>
         <div
           class="subItems contextmenuListBox"
-          :class="{ isDark: isDark, showLeft: subItemsShowLeft }"
+          :class="{ isDark: isDark }"
           style="top: -10px"
         >
           <div
@@ -374,7 +378,7 @@
         <span class="el-icon-arrow-right"></span>
         <div
           class="subItems listBox"
-          :class="{ isDark: isDark, showLeft: subItemsShowLeft }"
+          :class="{ isDark: isDark }"
           style="top: -10px"
         >
           <div class="item" @click="selectNodes('all')">所有节点</div>
@@ -430,7 +434,7 @@
         </div>
         <div
           class="subItems contextmenuListBox"
-          :class="{ isDark: isDark, showLeft: subItemsShowLeft }"
+          :class="{ isDark: isDark }"
           style="top: -130px"
         >
           <div
@@ -469,6 +473,7 @@ import { transformToMarkdown } from 'simple-mind-map/src/parse/toMarkdown'
 import txt from '@/utils/txt'
 import { setDataToClipboard, setImgToClipboard, copy } from '@/utils'
 import NodeFeatures from './NodeFeatures.vue'
+import { placeContextMenu, placeSubmenu } from '@/utils/contextmenuPosition'
 
 export default {
   components: {
@@ -492,7 +497,7 @@ export default {
       enableCopyToClipboardApi: navigator.clipboard,
       numberType: '',
       numberLevel: '',
-      subItemsShowLeft: false,
+
       isNodeMousedown: false,
       linesHidden: false,
       listBoxWidth: '250px',
@@ -629,8 +634,11 @@ export default {
     },
     styleObj() {
       const res = {
+        position: this.isMobile ? 'absolute' : 'fixed',
+        zIndex: this.isMobile ? 2 : 65,
         left: this.left + 'px',
         top: this.top + 'px',
+        maxHeight: Math.max(80, this.mindMap.height - 16) + 'px',
         width: this.listBoxWidth
       }
       if (this.isMobile) {
@@ -641,9 +649,10 @@ export default {
   },
   created() {
     if (this.mindMap) {
-      this.mindMap.on('chat_dialog_dblclick', this.onChatDialogDblclick)
       this.mindMap.on('node_link_not_find', this.onNodeLinkNotFind)
     }
+    this.$root.$bus.$on('showNodeCallout', this.quickCallout)
+    this.$root.$bus.$on('showNodeNotation', this.quickNotation)
     this.$root.$bus.$on('node_contextmenu', this.show)
     this.$root.$bus.$on('node_click', this.hide)
     this.$root.$bus.$on('draw_click', this.hide)
@@ -658,8 +667,11 @@ export default {
     }
   },
   beforeDestroy() {
+    // 桌面菜单挂在 body，避免 Obsidian 叶片 contain:strict 裁切浮层。
+    if (this.$el.parentNode === document.body) this.$el.remove()
+    this.$root.$bus.$off('showNodeCallout', this.quickCallout)
+    this.$root.$bus.$off('showNodeNotation', this.quickNotation)
     if (this.mindMap) {
-      this.mindMap.off('chat_dialog_dblclick', this.onChatDialogDblclick)
       this.mindMap.off('node_link_not_find', this.onNodeLinkNotFind)
     }
     this.$root.$bus.$off('node_contextmenu', this.show)
@@ -676,6 +688,67 @@ export default {
     }
   },
   methods: {
+    mountMenuOverlay() {
+      if (!this.isMobile && this.$refs.contextmenuRef.parentNode !== document.body) {
+        document.body.appendChild(this.$refs.contextmenuRef)
+      }
+    },
+
+    onMenuOver(event) {
+      if (this.isMobile) return
+      const item = event.target.closest?.('.item')
+      if (!item || !this.$el.contains(item)) return
+      const submenu = [...item.children].find(el => el.classList.contains('subItems'))
+      if (submenu) this.positionSubmenu(submenu)
+    },
+
+    onMenuScroll() {
+      if (this.isMobile) return
+      this.$el.querySelectorAll('.subItems').forEach(submenu => {
+        if (getComputedStyle(submenu).visibility === 'visible') this.positionSubmenu(submenu)
+      })
+    },
+
+    positionSubmenu(submenu) {
+      const viewport = { width: window.innerWidth, height: window.innerHeight }
+      submenu.style.position = 'fixed'
+      submenu.style.maxHeight = `${viewport.height - 16}px`
+      submenu.style.maxWidth = `${viewport.width - 16}px`
+      submenu.style.overflowY = 'auto'
+      submenu.style.overflowX = 'hidden'
+      submenu.style.zIndex = '1'
+      const point = placeSubmenu(submenu.parentElement.getBoundingClientRect(), submenu.getBoundingClientRect(), viewport)
+      submenu.style.left = `${point.left}px`
+      submenu.style.top = `${point.top}px`
+    },
+
+    enterNodeFocus() {
+      const node = this.node
+      this.hide()
+      this.$root.$bus.$emit('enter_to_node', node)
+    },
+
+    toggleBlank() {
+      this.hide()
+      this.$root.$bus.$emit('toggle_blank_mode')
+    },
+
+    changeFreeLayout() {
+      const node = this.node
+      this.hide()
+      this.$root.$bus.$emit('show_change_freenodetree_layout', [node])
+    },
+
+    quickCallout(nodes) {
+      if (this.mindMap.opt.readonly || !nodes?.length) return
+      this.mindMap.emit('chat_dialog_style', nodes[0])
+    },
+
+    quickNotation(nodes) {
+      if (this.mindMap.opt.readonly || !nodes?.length) return
+      this.show({ clientX: this.mindMap.elRect.left + 20, clientY: this.mindMap.elRect.top + 20 }, nodes[0])
+      this.$nextTick(() => this.openNotationDialog())
+    },
     ...mapMutations(['setLocalConfig']),
 
     getShowPosition(x, y) {
@@ -688,17 +761,9 @@ export default {
         }
       }
       const elRect = this.mindMap.elRect
-      x -= elRect.left
-      y -= elRect.top
       const rect = this.$refs.contextmenuRef.getBoundingClientRect()
-      if (x + rect.width > elRect.width) {
-        x = x - rect.width - 20
-      }
-      this.subItemsShowLeft = x + rect.width + 150 > elRect.right
-      if (y + rect.height > elRect.height) {
-        y = elRect.height - rect.height - 10
-      }
-      return { x, y }
+      const point = placeContextMenu({ x, y }, rect, elRect)
+      return { x: point.left + elRect.left, y: point.top + elRect.top }
     },
 
     show(e, node) {
@@ -713,32 +778,10 @@ export default {
           : number.level
         : ''
       this.$nextTick(() => {
+        this.mountMenuOverlay()
         const { x, y } = this.getShowPosition(e.clientX + 10, e.clientY + 10)
         this.left = x
         this.top = y
-      })
-    },
-
-    onChatDialogDblclick(e, node) {
-      if (
-        !node ||
-        this.isReadonly ||
-        (this.mindMap && this.mindMap.opt && this.mindMap.opt.readonly)
-      ) {
-        return
-      }
-      const event = e || {}
-      this.show(
-        {
-          clientX: Number.isFinite(event.clientX) ? event.clientX : 10,
-          clientY: Number.isFinite(event.clientY) ? event.clientY : 10
-        },
-        node
-      )
-      this.$nextTick(() => {
-        if (this.$refs.nodeFeatures) {
-          this.$refs.nodeFeatures.openCalloutDialog()
-        }
       })
     },
 
@@ -793,6 +836,7 @@ export default {
       this.type = 'svg'
       this.isShow = true
       this.$nextTick(() => {
+        this.mountMenuOverlay()
         const { x, y } = this.getShowPosition(e.clientX + 10, e.clientY + 10)
         this.left = x
         this.top = y
@@ -1136,6 +1180,7 @@ export default {
   position: absolute;
   max-height: calc(100vh - 20px);
   overflow-y: auto;
+  overflow-x: hidden;
   font-size: 14px;
   font-family: PingFangSC-Regular, PingFang SC;
   font-weight: 400;
@@ -1201,7 +1246,7 @@ export default {
     &:hover {
       background: #f5f5f5;
 
-      .subItems {
+      > .subItems {
         visibility: visible;
       }
     }
@@ -1243,10 +1288,6 @@ export default {
       visibility: hidden;
       width: 150px;
       cursor: auto;
-
-      &.showLeft {
-        left: -150px;
-      }
     }
   }
 }

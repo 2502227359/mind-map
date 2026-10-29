@@ -8,6 +8,7 @@ import { around } from 'monkey-around'
 import markdown from 'simple-mind-map/src/parse/markdown.js'
 import { showConfirmationDialog } from './ConfirmDialog.js'
 import { parseDocument } from '../../src/document/format.js'
+import { openMarkdownMapPreview } from '../../src/markdown-preview-view.js'
 
 export default class Menus {
   constructor(plugin) {
@@ -103,6 +104,11 @@ export default class Menus {
                 )
               }
             } else if (source === 'more-options') {
+              ;[false, true].forEach(split => menu.addItem(item => item
+                .setTitle(split ? '在分屏中预览为思维导图' : '在新标签页预览为思维导图')
+                .setIcon('smm-icon')
+                .setSection('pane')
+                .onClick(() => openMarkdownMapPreview(self.plugin, this.file, split))))
               menu.addItem(item =>
                 item
                   .setTitle(self._t('action.previewAsMindMap'))
