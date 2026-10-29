@@ -16,6 +16,7 @@ import { transformToTxt } from '../parse/toTxt'
 import { transformToMermaid } from '../parse/toMermaid'
 import { createHtmlDocument } from '../parse/toHtml'
 import { transformToOpml } from '../parse/opml'
+import { transformToFreemind } from '../parse/freemind'
 
 //  导出插件
 class Export {
@@ -482,6 +483,16 @@ class Export {
     return readBlob(new Blob([transformToOpml(this.mindMap.getData(), name)], {
       type: 'text/xml;charset=utf-8'
     }))
+  }
+
+  async mm(name, options = {}) {
+    return readBlob(new Blob([transformToFreemind(this.mindMap.getData(), options)], {
+      type: 'text/xml;charset=utf-8'
+    }))
+  }
+
+  async freemind(name, options = {}) {
+    return this.mm(name, options)
   }
 }
 

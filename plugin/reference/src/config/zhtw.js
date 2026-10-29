@@ -566,6 +566,12 @@ export const downTypeList = [
     desc: 'XMind軟件格式'
   },
   {
+    name: 'FreeMind',
+    type: 'mm',
+    icon: 'iconwenjian',
+    desc: 'FreeMind .mm 格式，可交換節點層級、連結和備註'
+  },
+  {
     name: 'Txt',
     type: 'txt',
     icon: 'iconTXT',
@@ -576,6 +582,12 @@ export const downTypeList = [
     type: 'json',
     icon: 'iconjson',
     desc: '流行的數據交換格式，可用于再次導入'
+  },
+  {
+    name: 'Excel',
+    type: 'xlsx',
+    icon: 'iconjson',
+    desc: 'Excel 表格格式，可交換節點層級、連結和備註'
   },
   {
     name: 'HTML 靜態網頁',

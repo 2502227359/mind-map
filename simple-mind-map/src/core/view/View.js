@@ -300,12 +300,59 @@ class View {
   }
 
   // 适应画布大小
+  getFitRect(getRbox) {
+    const customRect = typeof getRbox === 'function' ? getRbox() : null
+    if (customRect) return customRect
+    // draw 是所有渲染树共用的 SVG 容器；多根模式下不能只取主根节点的 group。
+    if (this.mindMap.draw && typeof this.mindMap.draw.rbox === 'function') {
+      const drawRect = this.mindMap.draw.rbox()
+      if (drawRect) return drawRect
+    }
+    const rects = this.getRenderNodeRects()
+    if (rects.length === 0) return this.mindMap.draw.rbox()
+    const left = Math.min(...rects.map(rect => rect.x))
+    const top = Math.min(...rects.map(rect => rect.y))
+    const right = Math.max(...rects.map(rect => rect.x + rect.width))
+    const bottom = Math.max(...rects.map(rect => rect.y + rect.height))
+    return {
+      x: left,
+      y: top,
+      width: right - left,
+      height: bottom - top
+    }
+  }
+
+  getRenderNodeRects() {
+    const renderer = this.mindMap.renderer || {}
+    let roots =
+      typeof renderer.getAllRenderRoot === 'function'
+        ? renderer.getAllRenderRoot()
+        : renderer.root
+          ? [renderer.root]
+          : []
+    if ((!Array.isArray(roots) || roots.length === 0) && renderer.root) {
+      roots = [renderer.root]
+    }
+    const rects = []
+    const visit = node => {
+      if (!node) return
+      if (node.group && typeof node.group.rbox === 'function') {
+        rects.push(node.group.rbox())
+      } else if (typeof node.rbox === 'function') {
+        rects.push(node.rbox())
+      }
+      if (Array.isArray(node.children)) node.children.forEach(visit)
+    }
+    ;(Array.isArray(roots) ? roots : []).forEach(visit)
+    return rects.filter(Boolean)
+  }
+
   fit(getRbox = () => {}, enlarge = false, fitPadding) {
     fitPadding =
       fitPadding === undefined ? this.mindMap.opt.fitPadding : fitPadding
     const draw = this.mindMap.draw
     const origTransform = draw.transform()
-    const rect = getRbox() || draw.rbox()
+    const rect = this.getFitRect(getRbox)
     const drawWidth = rect.width / origTransform.scaleX
     const drawHeight = rect.height / origTransform.scaleY
     const drawRatio = drawWidth / drawHeight
@@ -333,7 +380,7 @@ class View {
       newScale = newWidth / drawWidth
     }
     this.setScale(newScale)
-    const newRect = getRbox() || draw.rbox()
+    const newRect = this.getFitRect(getRbox)
     // 需要考虑画布容器距浏览器窗口左上角的距离
     newRect.x -= this.mindMap.elRect.left
     newRect.y -= this.mindMap.elRect.top
@@ -416,15 +463,31 @@ class View {
   getPositionLimit() {
     const { scaleX, scaleY } = this.mindMap.draw.transform()
     const drawRect = this.mindMap.draw.rbox()
-    const rootRect = this.mindMap.renderer.root.group.rbox()
-    const rootCenterOffset = this.mindMap.renderer.layout.getRootCenterOffset(
-      rootRect.width,
-      rootRect.height
-    )
+    const renderer = this.mindMap.renderer || {}
+    const rects = this.getRenderNodeRects()
+    const rootRect = rects.length
+      ? {
+          x: Math.min(...rects.map(rect => rect.x)),
+          y: Math.min(...rects.map(rect => rect.y)),
+          width:
+            Math.max(...rects.map(rect => rect.x + rect.width)) -
+            Math.min(...rects.map(rect => rect.x)),
+          height:
+            Math.max(...rects.map(rect => rect.y + rect.height)) -
+            Math.min(...rects.map(rect => rect.y))
+        }
+      : drawRect
+    const layout = renderer.layout
+    const rootCenterOffset =
+      layout && typeof layout.getRootCenterOffset === 'function'
+        ? layout.getRootCenterOffset(rootRect.width, rootRect.height)
+        : { x: 0, y: 0 }
+    const rootRight = rootRect.x + rootRect.width
+    const rootBottom = rootRect.y + rootRect.height
     const left = rootRect.x - drawRect.x - rootCenterOffset.x * scaleX
-    const right = rootRect.x - drawRect.x2 - rootCenterOffset.x * scaleX
+    const right = rootRect.x - rootRight - rootCenterOffset.x * scaleX
     const top = rootRect.y - drawRect.y - rootCenterOffset.y * scaleY
-    const bottom = rootRect.y - drawRect.y2 - rootCenterOffset.y * scaleY
+    const bottom = rootRect.y - rootBottom - rootCenterOffset.y * scaleY
     return {
       scale: scaleX,
       left,

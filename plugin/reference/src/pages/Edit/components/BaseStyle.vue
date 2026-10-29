@@ -13,6 +13,22 @@
       :class="{ isDark: isDark }"
       v-if="data"
     >
+      <div class="smmSidebarGroupTitle noTop">手绘与连线动画</div>
+      <div class="row">
+        <el-checkbox v-model="style.handDrawnLikeStyle.enabled" @change="update('handDrawnLikeStyle', { ...style.handDrawnLikeStyle })">手绘风格</el-checkbox>
+      </div>
+      <div class="row" v-if="style.handDrawnLikeStyle.enabled">
+        <span class="name">手绘强度</span>
+        <el-input-number size="mini" v-model="style.handDrawnLikeStyle.roughness" :min="0.1" :max="5" :step="0.1" @change="update('handDrawnLikeStyle', { ...style.handDrawnLikeStyle })" />
+      </div>
+      <div class="row">
+        <el-checkbox v-model="style.lineFlow" @change="update('lineFlow', $event)">虚线流动（需设置虚线）</el-checkbox>
+      </div>
+      <div class="row" v-if="style.lineFlow">
+        <el-checkbox v-model="style.lineFlowForward" @change="update('lineFlowForward', $event)">正向流动</el-checkbox>
+        <el-input-number size="mini" v-model="style.lineFlowDuration" :min="0.1" :max="20" :step="0.1" @change="update('lineFlowDuration', $event)" />
+        <span>秒</span>
+      </div>
       <div class="smmSidebarGroupTitle noTop">
         {{ $t('baseStyle.background') }}
       </div>
@@ -918,6 +934,7 @@ export default {
       activeTab: 'color',
       marginActiveTab: 'second',
       style: {
+        handDrawnLikeStyle: { enabled: false, roughness: 1.5 },
         backgroundColor: '',
         lineColor: '',
         lineDasharray: '',
@@ -1046,7 +1063,9 @@ export default {
       Object.keys(this.style)
         .filter(key => !['lineRainbow', 'lineRainbowColorsList'].includes(key))
         .forEach(key => {
-          this.style[key] = this.mindMap.getThemeConfig(key)
+          this.style[key] = key === 'handDrawnLikeStyle'
+            ? { enabled: false, roughness: 1.5, ...this.mindMap.getThemeConfig(key) }
+            : this.mindMap.getThemeConfig(key)
           if (key === 'backgroundImage' && this.style[key] === 'none') {
             this.style[key] = ''
           }

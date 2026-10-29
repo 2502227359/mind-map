@@ -1,14 +1,4 @@
 /* 通用 */
-.personal-mindmap-block-modal {
-  width: 96vw;
-  max-width: 1600px;
-  height: 90vh;
-}
-.personal-mindmap-block-modal .modal-content {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
 .personal-mindmap-block-actions {
   display: flex;
   align-items: center;
@@ -17,10 +7,10 @@
   padding: 6px 0;
   flex-shrink: 0;
 }
-.personal-mindmap-block-editor {
-  flex: 1;
-  min-height: 0;
-  position: relative;
+.personal-mindmap-block-inline {
+  min-height: 520px;
+  resize: vertical;
+  overflow: hidden;
 }
 .personal-mindmap-block-preview {
   position: relative;

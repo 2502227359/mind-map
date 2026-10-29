@@ -13,6 +13,14 @@
       :class="{ isDark: isDark }"
       v-if="configData"
     >
+      <div class="smmSidebarGroupTitle noTop">画布与节点增强</div>
+      <div class="row" v-for="option in enhancedOptions" :key="option.key">
+        <el-checkbox v-model="config[option.key]" @change="updateOtherConfig(option.key, $event)">{{ option.label }}</el-checkbox>
+      </div>
+      <div class="row">
+        <span class="name">同级对齐初始宽度</span>
+        <el-input-number size="mini" v-model="config.nodeInitialAutoAlignWidth" :min="50" :max="1500" :step="10" @change="updateOtherConfig('nodeInitialAutoAlignWidth', $event)" />
+      </div>
       <div class="smmSidebarGroupTitle noTop">{{ $t('setting.title1') }}</div>
       <div class="row">
         <div class="rowItem">
@@ -405,7 +413,15 @@ export default {
   },
   data() {
     return {
+      enhancedOptions: [
+        { key: 'enableMomentum', label: '画布拖动惯性' },
+        { key: 'enableAutoNodeAlign', label: '自动对齐同层级节点宽度' },
+        { key: 'onlyLoadClientRectImg', label: '仅加载可见区域的节点图片' }
+      ],
       config: {
+        enableMomentum: false,
+        enableAutoNodeAlign: false,
+        onlyLoadClientRectImg: false,
         openPerformance: false,
         enableFreeDrag: false,
         mousewheelAction: 'zoom',
@@ -517,6 +533,8 @@ export default {
       this.$root.$obsidianAPI.saveMindMapConfig(this.configData)
       if (
         [
+          'enableAutoNodeAlign',
+          'nodeInitialAutoAlignWidth',
           'alwaysShowExpandBtn',
           'imgTextMargin',
           'textContentMargin',

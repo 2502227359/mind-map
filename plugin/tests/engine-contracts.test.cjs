@@ -13,20 +13,21 @@ test('扩展导出接口返回可读取的格式数据，HTML 等待 SVG 资源�
   const root = { data: { text: '中心' }, children: [{ data: { text: '子节点' }, children: [] }] }
   const exporter = new Export({ mindMap: { getData: () => root } })
   const decode = url => Buffer.from(url.slice(url.indexOf(',') + 1), 'base64').toString('utf8')
-  assert.match(decode(await exporter.mmd('示例')), /^mindmap/m)
+  assert.match(decode(await exporter.mmd('示例')), /^flowchart TD/m)
   assert.match(decode(await exporter.opml('示例')), /<opml\b/)
+  assert.match(decode(await exporter.mm('示例')), /<map version="1\.0\.1">/)
   let svgReady = false
   let svgArgs
   exporter.svg = async (...args) => {
     svgArgs = args
     await Promise.resolve()
     svgReady = true
-    return 'data:image/svg+xml;base64,PHN2Zy8+'
+    return 'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4='
   }
   const html = decode(await exporter.html('示例'))
   assert.equal(svgReady, true)
   assert.equal(svgArgs[3], true)
-  assert.match(html, /data:image\/svg\+xml;base64,PHN2Zy8\+/)
+  assert.match(html, /<main><svg><\/svg><\/main>/)
 })
 
 test('HTML 的图片和背景加载失败会拒绝导出，不生成缺图文件或挂起', async () => {
@@ -249,6 +250,42 @@ test('XMind 导出使用根节点 imgMap 解析节点图片资源', async () => 
     await zip.files['resources/image_0.png'].async('base64'),
     'AAAA'
   )
+})
+
+test('节点图片存储遍历主根和自由根并清理未引用图片', async () => {
+  const NodeBase64ImageStorage = await loadBundled(
+    'simple-mind-map/src/plugins/NodeBase64ImageStorage.js'
+  )
+  const image = 'data:image/png;base64,AAAA'
+  const renderTree = {
+    data: {
+      text: '主根',
+      imgMap: { stale: 'data:image/png;base64,STALE' },
+      freeNodeTrees: [
+        {
+          data: { text: '自由根', image },
+          children: []
+        }
+      ]
+    },
+    children: [{ data: { text: '主子', image }, children: [] }]
+  }
+  const events = {}
+  const mindMap = {
+    renderer: { renderTree },
+    on(name, handler) {
+      events[name] = handler
+    },
+    off() {}
+  }
+  new NodeBase64ImageStorage({ mindMap }).onBeforeAddHistory()
+
+  const imageKeys = Object.keys(renderTree.data.imgMap)
+  assert.equal(imageKeys.length, 1)
+  assert.equal(renderTree.children[0].data.image, imageKeys[0])
+  assert.equal(renderTree.data.freeNodeTrees[0].data.image, imageKeys[0])
+  assert.equal(renderTree.data.imgMap[imageKeys[0]], image)
+  assert.equal(typeof events.beforeAddHistory, 'function')
 })
 
 test('超链接节点支持动态图标并把原始事件传给跳转回调，标签支持双击事件', async () => {

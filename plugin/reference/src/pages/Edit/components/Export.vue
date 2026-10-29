@@ -28,7 +28,7 @@
           >
             <div class="typeIcon" :class="[item.type]">
               <span
-                v-if="['html', 'mmd', 'opml'].includes(item.type)"
+                v-if="['html', 'mmd', 'opml', 'mm', 'xlsx'].includes(item.type)"
                 class="iconfont"
                 :class="item.icon"
               ></span>
@@ -154,9 +154,10 @@
 <script>
 import { mapState, mapMutations } from 'vuex'
 import { downTypeList } from '@/config'
-import { createUid } from 'simple-mind-map/src/utils/index'
+import { createUid, downloadFile } from 'simple-mind-map/src/utils/index'
 import MarkdownIt from 'markdown-it'
 import { isHyperlink, isNormalUrl, imageUrlToBase64 } from '@/utils'
+import { exportExcel as createExcelFile } from '../../../../../src/formats/excel'
 
 let md = null
 export default {
@@ -287,6 +288,15 @@ export default {
             }
           }
         })
+      } else if (this.exportType === 'xlsx') {
+        try {
+          this.downloadExcel()
+        } catch (error) {
+          this.$root.$obsidianAPI.showTip(
+            `Excel导出失败：${error.message || error}`
+          )
+          return
+        }
       } else if (this.exportType === 'xmind') {
         this.$root.$bus.$emit(
           'export',
@@ -312,11 +322,23 @@ export default {
       this.cancel()
     },
 
+    downloadExcel() {
+      const mindMap = this.$root.$getCurrentMindMap()
+      const blob = createExcelFile(mindMap.getData())
+      const url = URL.createObjectURL(blob)
+      downloadFile(url, `${this.fileName}.xlsx`)
+      setTimeout(() => URL.revokeObjectURL(url), 0)
+    },
+
     async transformMindMapData(data) {
       if (!data) return
       const waitLoadImageList = []
       const nodeTree = data.root ? data.root : data
       const imgMap = nodeTree.data.imgMap || {}
+      const roots = [
+        nodeTree,
+        ...((nodeTree.data && nodeTree.data.freeNodeTrees) || [])
+      ]
       const pathToKeyMap = {}
       const walk = root => {
         const image = root.data.image
@@ -349,7 +371,7 @@ export default {
           })
         }
       }
-      walk(nodeTree)
+      roots.forEach(walk)
       if (waitLoadImageList.length > 0) {
         await Promise.all(waitLoadImageList)
       }

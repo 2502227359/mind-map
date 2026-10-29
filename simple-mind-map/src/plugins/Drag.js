@@ -89,7 +89,7 @@ class Drag extends Base {
       this.mindMap.opt.readonly ||
       e.which !== 1 ||
       node.isGeneralization ||
-      node.isRoot
+      node === this.mindMap.renderer.root
     ) {
       return
     }
@@ -184,7 +184,7 @@ class Drag extends Base {
       )
     } else if (
       this.clone &&
-      enableFreeDrag &&
+      (enableFreeDrag || this.mousedownNode.isRoot) &&
       this.beingDragNodeList.length === 1
     ) {
       // 如果只拖拽了一个节点，那么设置自定义位置
@@ -263,7 +263,7 @@ class Drag extends Base {
           getTopAncestorsFomNodeList(
             // 过滤掉根节点和概要节点
             this.mindMap.renderer.activeNodeList.filter(item => {
-              return !item.isRoot && !item.isGeneralization
+              return item !== this.mindMap.renderer.root && !item.isGeneralization
             })
           )
         )
@@ -290,7 +290,7 @@ class Drag extends Base {
   // 节点由树转换成数组，从子节点到根节点
   nodeTreeToList() {
     const list = []
-    bfsWalk(this.mindMap.renderer.root, node => {
+    this.mindMap.renderer.bfsWalkAll( node => {
       // 过滤掉当前被拖拽的节点
       if (this.checkIsInBeingDragNodeList(node)) {
         return
@@ -427,7 +427,7 @@ class Drag extends Base {
       if (this.overlapNode || (this.prevNode && this.nextNode)) {
         return
       }
-      switch (this.mindMap.opt.layout) {
+      switch (node.getLayout().layout) {
         case LOGICAL_STRUCTURE:
         case LOGICAL_STRUCTURE_LEFT:
           this.handleLogicalStructure(node)
@@ -489,8 +489,8 @@ class Drag extends Base {
     const { LEFT, TOP, RIGHT, BOTTOM } = CONSTANTS.LAYOUT_GROW_DIR
     const layerIndex = this.overlapNode.layerIndex
     const children = this.overlapNode.children
-    const marginX = this.mindMap.renderer.layout.getMarginX(layerIndex + 1)
-    const marginY = this.mindMap.renderer.layout.getMarginY(layerIndex + 1)
+    const marginX = this.overlapNode.getLayout().getMarginX(layerIndex + 1)
+    const marginY = this.overlapNode.getLayout().getMarginY(layerIndex + 1)
     const halfPlaceholderWidth = this.placeholderWidth / 2
     const halfPlaceholderHeight = this.placeholderHeight / 2
     let dir = ''
@@ -503,7 +503,7 @@ class Drag extends Base {
       const lastChild = children[children.length - 1]
       const lastNodeRect = this.getNodeRect(lastChild)
       dir = this.getNewChildNodeDir(lastChild)
-      switch (this.mindMap.opt.layout) {
+      switch (this.overlapNode.getLayout().layout) {
         case LOGICAL_STRUCTURE:
         case MIND_MAP:
           x =
@@ -622,7 +622,7 @@ class Drag extends Base {
       // 目标节点不存在子节点，那么基于目标节点定位
       const nodeRect = this.getNodeRect(this.overlapNode)
       dir = this.getNewChildNodeDir(this.overlapNode)
-      switch (this.mindMap.opt.layout) {
+      switch (this.overlapNode.getLayout().layout) {
         case LOGICAL_STRUCTURE:
         case MIND_MAP:
           x =
@@ -735,7 +735,7 @@ class Drag extends Base {
       RIGHT_FISHBONE,
       RIGHT_FISHBONE2
     } = CONSTANTS.LAYOUT
-    switch (this.mindMap.opt.layout) {
+    switch (node.getLayout().layout) {
       case LOGICAL_STRUCTURE:
         return CONSTANTS.LAYOUT_GROW_DIR.RIGHT
       case LOGICAL_STRUCTURE_LEFT:
@@ -758,7 +758,7 @@ class Drag extends Base {
   // 垂直方向比较
   // isReverse：是否反向
   handleVerticalCheck(node, checkList, isReverse = false) {
-    const { layout } = this.mindMap.opt
+    const layout = node.getLayout().layout
     const { LAYOUT, LAYOUT_GROW_DIR } = CONSTANTS
     const {
       VERTICAL_TIMELINE,
@@ -907,7 +907,7 @@ class Drag extends Base {
 
   // 水平方向比较
   handleHorizontalCheck(node, checkList) {
-    const { layout } = this.mindMap.opt
+    const layout = node.getLayout().layout
     const { LAYOUT } = CONSTANTS
     const {
       FISHBONE,
@@ -1098,7 +1098,7 @@ class Drag extends Base {
     parent.children = [tmpNode]
     parent._lines = []
     this.placeHolderLine.show()
-    this.mindMap.renderer.layout.renderLine(
+    node.getLayout().renderLine(
       parent,
       [this.placeHolderLine],
       (...args) => {

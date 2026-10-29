@@ -120,6 +120,11 @@ export const defaultOpt = {
   ],
   // 节点最大缓存数量
   maxNodeCacheCount: 1000,
+  // 画布与节点增强功能按需启用。
+  enableMomentum: false,
+  enableAutoNodeAlign: false,
+  onlyLoadClientRectImg: false,
+  nodeInitialAutoAlignWidth: 200,
   // 思维导图适应画布大小时的内边距
   fitPadding: 50,
   // 是否开启按住ctrl键多选节点功能

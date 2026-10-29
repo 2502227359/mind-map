@@ -5,6 +5,15 @@
       :class="{ isDark: isDark }"
       v-if="activeNodes.length > 0"
     >
+      <div class="smmSidebarGroupTitle">节点连线动画</div>
+      <div class="row">
+        <el-checkbox v-model="style.lineFlow" @change="update('lineFlow')">虚线流动（需设置虚线）</el-checkbox>
+      </div>
+      <div class="row" v-if="style.lineFlow">
+        <el-checkbox v-model="style.lineFlowForward" @change="update('lineFlowForward')">正向流动</el-checkbox>
+        <el-input-number size="mini" v-model="style.lineFlowDuration" :min="0.1" :max="20" :step="0.1" @change="update('lineFlowDuration')" />
+        <span>秒</span>
+      </div>
       <div class="smmSidebarGroupTitle noTop">{{ $t('style.text') }}</div>
       <div class="row">
         <el-select
@@ -667,7 +676,7 @@ export default {
         ...(shapeList[this.$i18n.locale] || shapeList.en),
         ...this.mindMap.extendShapeList
           .filter(item => {
-            return !['fishHead'].includes(item.name)
+            return !['fishHead', 'rightFishHead'].includes(item.name)
           })
           .map(item => {
             return {

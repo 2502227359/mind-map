@@ -18,7 +18,7 @@ function renderExpandBtnPlaceholderRect() {
       })
     }
     this.group.add(this._unVisibleRectRegionNode)
-    this.renderer.layout.renderExpandBtnRect(
+    this.getLayout().renderExpandBtnRect(
       this._unVisibleRectRegionNode,
       expandBtnSize,
       width,

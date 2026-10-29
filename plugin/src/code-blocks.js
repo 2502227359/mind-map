@@ -1,4 +1,4 @@
-import { MarkdownRenderChild, MarkdownView, Modal, Notice } from 'obsidian'
+import { MarkdownRenderChild, MarkdownView, Notice } from 'obsidian'
 import { initApp } from '../reference/src/main.js'
 import { createEditorApi } from './editor-api.js'
 import { createDocument, parseDocument } from './document/format.js'
@@ -38,7 +38,7 @@ function mountEditor(container, plugin, file, data, options = {}) {
     app: plugin.app, plugin, getFile: () => file, assetStore: plugin.assets,
     saveFileToVault: (asset, kind = true) => plugin.assets.saveFile(asset, file, kind === true || kind === 'image' ? 'image' : 'attachment'),
     documentApi: {
-      isActive: () => !options.readonly && container.isConnected && container.closest('.modal') != null,
+      isActive: () => !options.readonly && container.isConnected && container.clientWidth > 0 && container.clientHeight > 0 && plugin.app.workspace.activeLeaf?.view?.containerEl.contains(container),
       getIsReadonlyMode: () => Boolean(options.readonly),
       getIsCodeBlock: () => true,
       getInitMindMapData: () => JSON.stringify(initial),
@@ -61,9 +61,9 @@ function destroyEditor(editor, plugin) {
   editor.$el.remove()
 }
 
-class CodeBlockModal extends Modal {
+class CodeBlockSession {
   constructor(plugin, file, locator, source) {
-    super(plugin.app)
+    this.app = plugin.app
     this.plugin = plugin
     this.file = file
     this.locator = locator
@@ -72,26 +72,22 @@ class CodeBlockModal extends Modal {
     this.current = JSON.stringify(this.data)
     this.saved = this.current
     this.pending = Promise.resolve()
+    plugin._codeBlockSessions.add(this)
   }
 
-  onOpen() {
-    this.modalEl.classList.add('personal-mindmap-block-modal')
-    const bar = this.contentEl.createDiv('personal-mindmap-block-actions')
-    bar.createEl('span', { text: '代码块导图：保存时只更新当前区块' })
-    const save = bar.createEl('button', { text: '保存并关闭', cls: 'mod-cta' })
+  mount(host, actions) {
+    this.host = host
+    const save = actions.createEl('button', { text: '保存导图', cls: 'mod-cta' })
     save.onclick = async () => {
       save.disabled = true
-      try { await this.capture(); await this.save(); this.close() }
+      try { await this.capture(); await this.save(); new Notice('代码块导图已保存') }
       catch (error) { this.report(error) }
       finally { save.disabled = false }
     }
-    this.host = this.contentEl.createDiv('smm-common-full-size personal-mindmap-block-editor')
-    this.editor = mountEditor(this.host, this.plugin, this.file, this.data, {
+    this.editor = mountEditor(host, this.plugin, this.file, this.data, {
       onData: content => { this.current = content },
       onSave: async () => { await this.capture(); await this.save() }
     })
-    this.resize = new ResizeObserver(() => this.editor?.$updateMindMapSize())
-    this.resize.observe(this.host)
   }
 
   async capture() {
@@ -155,10 +151,16 @@ class CodeBlockModal extends Modal {
     }
   }
 
-  onClose() {
-    this.resize?.disconnect()
-    this.capture().then(() => this.save()).catch(error => this.recover(error))
-      .finally(() => { destroyEditor(this.editor, this.plugin); this.editor = null; this.contentEl.empty() })
+  dispose() {
+    if (this.disposed) return this.disposing
+    this.disposed = true
+    this.disposing = this.capture().then(() => this.save()).catch(error => this.recover(error))
+      .finally(() => {
+        destroyEditor(this.editor, this.plugin)
+        this.editor = null
+        this.plugin._codeBlockSessions.delete(this)
+      })
+    return this.disposing
   }
 }
 
@@ -175,18 +177,36 @@ class CodeBlockPreview extends MarkdownRenderChild {
     try { this.data = readMap(this.source) }
     catch (error) { containerEl.createEl('p', { text: `导图代码块数据无效：${error.message}` }); return }
     const actions = containerEl.createDiv('personal-mindmap-block-actions')
-    const button = actions.createEl('button', { text: '编辑导图' })
-    button.onclick = () => this.openEditor().catch(error => new Notice(error.message))
+    this.actions = actions
+    this.status = actions.createEl('span', { text: '思维导图' })
     this.host = containerEl.createDiv('smm-common-full-size personal-mindmap-block-preview')
     this.host.style.height = `${Math.max(180, Number(plugin.settings.codeBlockInitHeight) || 300)}px`
+    this.disposed = false
     this.resize = new ResizeObserver(() => {
-      if (this.editor) this.editor.$updateMindMapSize()
-      else if (this.host.clientWidth > 0 && this.host.clientHeight > 0) {
-        const file = plugin.app.vault.getFileByPath(context.sourcePath)
-        this.editor = mountEditor(this.host, plugin, file, this.data, { readonly: true })
+      const visible = this.host.clientWidth > 0 && this.host.clientHeight > 0
+      if (!visible && this.wasVisible && this.session) {
+        this.session.capture().then(() => this.session.save()).catch(error => this.session.recover(error))
       }
+      this.wasVisible = visible
+      if (this.session?.editor) this.session.editor.$updateMindMapSize()
+      else if (this.editor) this.editor.$updateMindMapSize()
+      else if (this.host.clientWidth > 0 && this.host.clientHeight > 0) this.initialize()
     })
     this.resize.observe(this.host)
+  }
+
+  initialize() {
+    if (this.initializing || this.disposed) return
+    this.initializing = true
+    // 处理器初次调用时容器尚未挂载，需等到可见后再辨认阅读与编辑模式。
+    this.inline = !!this.containerEl.closest('.markdown-source-view')
+    this.status.setText(this.inline ? '笔记内编辑 · 修改后点击保存导图' : '思维导图 · 阅读模式')
+    if (this.inline) {
+      this.openEditor().catch(error => new Notice(error.message))
+    } else {
+      const file = this.plugin.app.vault.getFileByPath(this.context.sourcePath)
+      this.editor = mountEditor(this.host, this.plugin, file, this.data, { readonly: true })
+    }
   }
 
   async openEditor() {
@@ -198,17 +218,31 @@ class CodeBlockPreview extends MarkdownRenderChild {
     const raw = views[0] ? views[0].editor.getValue() : vaultDocument
     const locator = { lineStart: this.context.getSectionInfo(this.containerEl)?.lineStart, document: raw, vaultDocument }
     replaceCodeBlock(raw, { ...locator, source: this.source }, this.source)
-    new CodeBlockModal(this.plugin, file, locator, this.source).open()
+    if (this.disposed) return
+    this.host.classList.add('personal-mindmap-block-inline')
+    this.session = new CodeBlockSession(this.plugin, file, locator, this.source)
+    this.session.mount(this.host, this.actions)
   }
 
-  onunload() { this.resize?.disconnect(); destroyEditor(this.editor, this.plugin); this.editor = null }
+  onunload() {
+    this.disposed = true
+    this.resize?.disconnect()
+    this.session?.dispose()
+    destroyEditor(this.editor, this.plugin)
+    this.editor = null
+  }
 }
 
 export function registerCodeBlocks(plugin) {
   plugin.assets = plugin.assets || new AssetStore(plugin.app, () => plugin.settings)
   plugin._codeBlockEditors = new Set()
+  plugin._codeBlockSessions = new Set()
   plugin.register(() => {
-    for (const editor of [...plugin._codeBlockEditors]) destroyEditor(editor, plugin)
+    const editing = new Set([...plugin._codeBlockSessions].map(session => session.editor))
+    for (const session of [...plugin._codeBlockSessions]) session.dispose()
+    for (const editor of [...plugin._codeBlockEditors]) {
+      if (!editing.has(editor)) destroyEditor(editor, plugin)
+    }
   })
   plugin.registerMarkdownCodeBlockProcessor('smm', (source, element, context) => {
     context.addChild(new CodeBlockPreview(element, plugin, source, context))

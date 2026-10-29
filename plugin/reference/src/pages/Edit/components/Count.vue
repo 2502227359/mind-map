@@ -44,7 +44,11 @@ export default {
       this.textStr = ''
       this.words = 0
       this.num = 0
-      this.walk(data)
+      const nodeTree = data && data.root ? data.root : data
+      const roots = nodeTree
+        ? [nodeTree, ...((nodeTree.data && nodeTree.data.freeNodeTrees) || [])]
+        : []
+      roots.forEach(root => this.walk(root))
       countEl.innerHTML = this.textStr
       this.words = countEl.textContent.length
       this.statusEl = document.querySelector('.smm-file-status')

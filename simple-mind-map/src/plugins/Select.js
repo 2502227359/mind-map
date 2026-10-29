@@ -207,7 +207,7 @@ class Select {
       }
     }
 
-    bfsWalk(this.mindMap.renderer.root, node => {
+    this.mindMap.renderer.bfsWalkAll( node => {
       check(node)
       // 概要节点
       if (node._generalizationList && node._generalizationList.length > 0) {

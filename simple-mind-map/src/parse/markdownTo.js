@@ -109,5 +109,10 @@ export const transformMarkdownTo = md => {
       currentChildren.push(...handleList(cur))
     }
   }
-  return root.children[0]
+  const [mainRoot, ...freeNodeTrees] = root.children
+  if (!mainRoot) return undefined
+  if (freeNodeTrees.length > 0) {
+    mainRoot.data.freeNodeTrees = freeNodeTrees
+  }
+  return mainRoot
 }

@@ -160,7 +160,11 @@ export const simpleDeepClone = data => {
 
 //  复制渲染树数据
 export const copyRenderTree = (tree, root, removeActiveState = false) => {
-  tree.data = simpleDeepClone(root.data)
+  const { freeNodeTrees, ...nodeData } = root.data || {}
+  tree.data = simpleDeepClone(nodeData)
+  if (Array.isArray(freeNodeTrees)) {
+    tree.data.freeNodeTrees = freeNodeTrees.map(item => copyRenderTree({}, item, removeActiveState))
+  }
   if (removeActiveState) {
     tree.data.isActive = false
     const generalizationList = formatGetNodeGeneralization(tree.data)
@@ -191,7 +195,13 @@ export const copyNodeTree = (
   removeId = true
 ) => {
   const rootData = root.nodeData ? root.nodeData : root
-  tree.data = simpleDeepClone(rootData.data)
+  const { freeNodeTrees, ...nodeData } = rootData.data || {}
+  tree.data = simpleDeepClone(nodeData)
+  if (Array.isArray(freeNodeTrees)) {
+    tree.data.freeNodeTrees = freeNodeTrees.map(item =>
+      copyNodeTree({}, item, removeActiveState, removeId)
+    )
+  }
   // 移除节点uid
   if (removeId) {
     delete tree.data.uid
@@ -305,13 +315,14 @@ export const debounce = (fn, wait = 300, ctx) => {
 }
 
 //  异步执行任务队列
-export const asyncRun = (taskList, callback = () => {}) => {
+export const asyncRun = (taskList, callback = () => {}, shouldContinue = () => true) => {
   let index = 0
   let len = taskList.length
   if (len <= 0) {
     return callback()
   }
   let loop = () => {
+    if (!shouldContinue()) return
     if (index >= len) {
       callback()
       return

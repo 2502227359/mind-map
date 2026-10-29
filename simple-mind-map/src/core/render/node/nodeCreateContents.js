@@ -14,6 +14,10 @@ import { Image as SVGImage, SVG, A, G, Rect, Text } from '@svgdotjs/svg.js'
 import iconsSvg from '../../../svg/icons'
 import { noneRichTextNodeLineHeight } from '../../../constants/constant'
 
+// 懒加载启用时先使用本地透明占位，避免节点初始化阶段触发图片请求。
+const EMPTY_IMAGE =
+  'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
+
 // 测量svg文本宽高
 const measureText = (text, style) => {
   const g = new G()
@@ -50,15 +54,24 @@ function createImgNode() {
   }
   img = (this.mindMap.renderer.renderTree.data.imgMap || {})[img] || img
   const imgSize = this.getImgShowSize()
-  const node = new SVGImage().load(img).size(...imgSize)
-  // 如果指定了加载失败显示的图片，那么加载一下图片检测是否失败
+  const lazyLoadImg = this.mindMap.lazyLoadImg
+  const shouldDefer = Boolean(
+    this.mindMap.opt.onlyLoadClientRectImg ||
+      (lazyLoadImg && lazyLoadImg.enabled)
+  )
+  const node = new SVGImage()
+    .load(shouldDefer ? EMPTY_IMAGE : img)
+    .size(...imgSize)
+  node._smmImageUrl = img
+  // 延迟模式下由 LazyLoadImg 在进入可视区后加载，不能提前创建探测请求。
   const { defaultNodeImage } = this.mindMap.opt
-  if (defaultNodeImage) {
-    const imgEl = new Image()
-    imgEl.onerror = () => {
+  if (defaultNodeImage && node.node && node.node.addEventListener) {
+    let fallbackLoaded = false
+    node.node.addEventListener('error', () => {
+      if (fallbackLoaded) return
+      fallbackLoaded = true
       node.load(defaultNodeImage)
-    }
-    imgEl.src = img
+    })
   }
   if (this.getData('imageTitle')) {
     node.attr('title', this.getData('imageTitle'))
@@ -189,6 +202,9 @@ function createRichTextNode(specifyText) {
   const html = `<div>${text}</div>`
   div.innerHTML = html
   const el = div.children[0]
+  if (typeof this.mindMap.opt.handleRichTextEl === 'function') {
+    this.mindMap.opt.handleRichTextEl(this, el)
+  }
   el.classList.add('smm-richtext-node-wrap')
   addXmlns(el)
   el.style.maxWidth = textAutoWrapWidth + 'px'
@@ -235,6 +251,9 @@ function createRichTextNode(specifyText) {
 
 //  创建文本节点
 function createTextNode(specifyText) {
+  if (this.getData('hideText')) {
+    return null
+  }
   if (this.getData('needUpdate')) {
     delete this.nodeData.data.needUpdate
   }
@@ -242,10 +261,13 @@ function createTextNode(specifyText) {
   if (this.getData('richText')) {
     return this.createRichTextNode(specifyText)
   }
-  const text =
+  let text =
     typeof specifyText === 'string' ? specifyText : this.getData('text')
   if (this.getData('resetRichText')) {
     delete this.nodeData.data.resetRichText
+  }
+  if (typeof this.mindMap.opt.handleNodeText === 'function') {
+    text = this.mindMap.opt.handleNodeText(this, text)
   }
   const g = new G()
   const fontSize = this.getStyle('fontSize', false)
@@ -317,6 +339,55 @@ function createTextNode(specifyText) {
   g.attr('data-width', width)
   g.attr('data-height', height)
   g.attr('data-ismultiLine', isMultiLine || textArr.length > 1)
+  return {
+    node: g,
+    width,
+    height
+  }
+}
+
+// 创建节点描述。描述独立于正文显示在节点底部，保存为普通节点数据。
+function createDescNode() {
+  const desc = String(this.getData('desc') || '').trim()
+  if (!desc) return null
+  const g = new G()
+  const descStyle = this.getData('descStyle') || {}
+  const fontSize = Math.max(
+    10,
+    Number(descStyle.fontSize) ||
+      Number(this.getStyle('fontSize', false) || 14) * 0.8
+  )
+  const color =
+    descStyle.color || this.getStyle('color', false) || '#888'
+  const lines = desc.split(/\r?\n/g)
+  const lineHeight = fontSize * 1.3
+  lines.forEach((line, index) => {
+    const text = new Text().text(line || '\uFEFF')
+    this.style.text(text)
+    text.attr({
+      'font-size': fontSize,
+      fill: color,
+      'font-style': descStyle.fontStyle || 'italic',
+      'font-weight': descStyle.fontWeight || 'normal'
+    })
+    text.y(lineHeight * index)
+    g.add(text)
+  })
+  const bbox = g.bbox()
+  const width = Math.min(
+    Math.ceil(bbox.width),
+    this.hasCustomWidth()
+      ? this.customTextWidth
+      : this.mindMap.opt.textAutoWrapWidth
+  )
+  const height = Math.ceil(Math.max(bbox.height, lineHeight))
+  g.attr('data-width', width)
+  g.attr('data-height', height)
+  g.on('dblclick', e => {
+    if (this.mindMap.opt.readonly) return
+    e.stopPropagation()
+    this.mindMap.emit('node_desc_dblclick', this, e)
+  })
   return {
     node: g,
     width,
@@ -605,6 +676,7 @@ export default {
   createIconNode,
   createRichTextNode,
   createTextNode,
+  createDescNode,
   createHyperlinkNode,
   createTagNode,
   createNoteNode,

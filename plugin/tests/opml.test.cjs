@@ -65,7 +65,11 @@ test("OPML 导出和解析保留层级、中文、特殊字符、链接和备注
   const xml = transformToOpml(source, "导图 & 标题")
   assert.match(xml, /<opml version="2\.0">/)
   assert.throws(() => transformToOpml({ data: { text: '节点\u0001' }, children: [] }), /控制字符/)
-  assert.throws(() => transformToOpml({ data: { text: '节点', freeNodeTrees: [source] }, children: [] }), /SMM\/JSON/)
+  const multiRootXml = transformToOpml({
+    data: { text: '根', freeNodeTrees: [source] },
+    children: []
+  })
+  assert.equal(parseOpml(multiRootXml).data.freeNodeTrees.length, 1)
   assert.match(xml, /根&#10;&lt;节点&gt;&#9;/)
   assert.match(xml, /obsidian:\/\/open\?vault=Vault&amp;file=首页\.md/)
   assert.match(xml, /title="入口&#13;&#10; &amp; 说明"/)
@@ -88,7 +92,7 @@ test("OPML 导出和解析保留层级、中文、特殊字符、链接和备注
   })
 })
 
-test("OPML 多根使用 head.title 合成根，并安全保留 url/xmlUrl/title", async () => {
+test("OPML 多根保留为 root.data.freeNodeTrees，并安全保留 url/xmlUrl/title", async () => {
   const { parseOpml } = await loadBundled()
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <opml version="2.0">
@@ -105,17 +109,18 @@ test("OPML 多根使用 head.title 合成根，并安全保留 url/xmlUrl/title"
 </opml>`
 
   const parsed = parseOpml(xml)
-  assert.equal(parsed.data.text, "订阅集合\n阅读")
-  assert.equal(parsed.children.length, 2)
-  assert.equal(parsed.children[0].data.hyperlink, "https://feeds.example/rss")
-  assert.equal(parsed.children[0].data.hyperlinkTitle, "订阅标题")
-  assert.equal(parsed.children[0].data.note, "RSS 备注")
-  assert.equal(parsed.children[0].children[0].data.text, "无 text 属性")
+  assert.equal(parsed.data.text, "订阅")
+  assert.equal(parsed.children.length, 1)
+  assert.equal(parsed.data.freeNodeTrees.length, 1)
+  assert.equal(parsed.data.hyperlink, "https://feeds.example/rss")
+  assert.equal(parsed.data.hyperlinkTitle, "订阅标题")
+  assert.equal(parsed.data.note, "RSS 备注")
+  assert.equal(parsed.children[0].data.text, "无 text 属性")
   assert.equal(
-    parsed.children[1].children[0].data.hyperlink,
+    parsed.data.freeNodeTrees[0].children[0].data.hyperlink,
     "obsidian://open?vault=Vault&file=笔记.md"
   )
-  assert.ok(parsed.children.every(node => Array.isArray(node.children)))
+  assert.ok(parsed.data.freeNodeTrees.every(node => Array.isArray(node.children)))
 })
 
 test("OPML 缺少 body、outline、根元素或包含 DOCTYPE/实体时拒绝解析", async () => {

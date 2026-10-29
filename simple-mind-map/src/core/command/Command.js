@@ -58,20 +58,17 @@ class Command {
 
   //  执行命令
   exec(name, ...args) {
-    if (this.commands[name]) {
-      this.commands[name].forEach(fn => {
-        fn(...args)
-      })
+    if (!this.commands[name]) return
+    this.execDepth = (this.execDepth || 0) + 1
+    try {
+      this.commands[name].forEach(fn => fn(...args))
       this.mindMap.emit('afterExecCommand', name, ...args)
-      if (
-        ['BACK', 'FORWARD', 'SET_NODE_ACTIVE', 'CLEAR_ACTIVE_NODE'].includes(
-          name
-        )
-      ) {
-        return
-      }
-      this.addHistory()
+    } finally {
+      this.execDepth--
     }
+    // 一个用户操作中的嵌套命令共同形成一条撤销记录。
+    if (this.execDepth || ['BACK', 'FORWARD', 'SET_NODE_ACTIVE', 'CLEAR_ACTIVE_NODE'].includes(name)) return
+    this.addHistory()
   }
 
   //  添加命令
@@ -92,7 +89,7 @@ class Command {
       this.commands[name] = []
       delete this.commands[name]
     } else {
-      let index = this.commands[name].find(item => {
+      let index = this.commands[name].findIndex(item => {
         return item === fn
       })
       if (index !== -1) {

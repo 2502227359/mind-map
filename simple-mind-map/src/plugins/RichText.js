@@ -886,8 +886,8 @@ class RichText {
     }
     const renderTree = this.mindMap.renderer.renderTree
     if (!renderTree) return
-    walk(
-      renderTree,
+    this.mindMap.renderer.getAllRenderTree().forEach(root => walk(
+      root,
       null,
       node => {
         if (node.data.richText) {
@@ -907,7 +907,7 @@ class RichText {
       true,
       0,
       0
-    )
+    ))
     this.afterHandleData()
   }
 
@@ -946,7 +946,7 @@ class RichText {
         })
       }
     }
-    walk(data)
+    ;[data, ...(data.data?.freeNodeTrees || [])].forEach(root => walk(root))
     return data
   }
 

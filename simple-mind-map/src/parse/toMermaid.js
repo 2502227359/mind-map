@@ -32,40 +32,53 @@ const getNodeText = data => {
   return data.richText ? nodeRichTextToTextWithWrap(text) : text
 }
 
-const getNodeId = path => {
-  return path.length > 0 ? `n0_${path.join('_')}` : 'n0'
+const getNodeId = (treeIndex, path) => {
+  const prefix = `n${treeIndex}`
+  return path.length > 0 ? `${prefix}_${path.join('_')}` : prefix
 }
 
-const assertNoFreeNodeTrees = node => {
-  if (!node || typeof node !== 'object') return
-  const data = node.data || {}
-  const freeNodeTrees = data.freeNodeTrees
-  const hasFreeNodeTrees = Array.isArray(freeNodeTrees)
-    ? freeNodeTrees.length > 0
-    : Boolean(freeNodeTrees)
-  if (hasFreeNodeTrees) {
-    throw new Error('Mermaid 导出暂不支持自由节点树，请使用 SMM/JSON')
+const getFreeNodeTrees = root => {
+  const freeNodeTrees = root && root.data ? root.data.freeNodeTrees : undefined
+  if (freeNodeTrees === undefined || freeNodeTrees === null) return []
+  if (!Array.isArray(freeNodeTrees)) {
+    throw new Error('Mermaid 自由节点树必须是数组')
   }
-  if (Array.isArray(node.children)) {
-    node.children.forEach(assertNoFreeNodeTrees)
-  }
+  return freeNodeTrees
 }
 
-const renderNode = (node, path, depth, lines) => {
+const renderNode = (node, treeIndex, path, depth, lines) => {
   if (!node || typeof node !== 'object') return
   const data = node.data || {}
   const indent = '  '.repeat(depth + 1)
-  lines.push(`${indent}${getNodeId(path)}["${escapeMermaidLabel(getNodeText(data))}"]`)
+  const id = getNodeId(treeIndex, path)
+  lines.push(`${indent}${id}["${escapeMermaidLabel(getNodeText(data))}"]`)
   if (!Array.isArray(node.children)) return
   node.children.forEach((child, index) => {
-    renderNode(child, [...path, index], depth + 1, lines)
+    const childPath = [...path, index]
+    const childId = getNodeId(treeIndex, childPath)
+    renderNode(child, treeIndex, childPath, depth + 1, lines)
+    lines.push(`${indent}${id} --> ${childId}`)
   })
 }
 
-// 转换成 Mermaid mindmap 格式，节点 id 只由树路径决定，重复导出结果稳定。
-export const transformToMermaid = root => {
-  assertNoFreeNodeTrees(root)
-  const lines = ['mindmap']
-  renderNode(root, [], 0, lines)
+const normalizeDirection = direction => {
+  const value = String(direction || 'TD').toUpperCase()
+  if (!['TB', 'TD', 'BT', 'RL', 'LR'].includes(value)) return 'TD'
+  return value
+}
+
+// 转换成 Mermaid flowchart 格式。每棵根树均独立输出，根节点间不虚构连线。
+export const transformToMermaid = (root, options = {}) => {
+  if (!root || typeof root !== 'object') {
+    throw new Error('Mermaid 根节点格式错误')
+  }
+  const trees = [root, ...getFreeNodeTrees(root)]
+  trees.forEach(tree => {
+    if (!tree || typeof tree !== 'object') {
+      throw new Error('Mermaid 自由节点树格式错误')
+    }
+  })
+  const lines = [`flowchart ${normalizeDirection(options.direction)}`]
+  trees.forEach((tree, index) => renderNode(tree, index, [], 0, lines))
   return lines.join('\n')
 }

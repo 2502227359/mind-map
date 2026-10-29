@@ -41,10 +41,12 @@ export const txtTo = (text, rootText = '') => {
   })
 
   if (root.children.length > 1) {
-    return {
-      data: { text: rootText || '根节点' },
-      children: root.children
+    const [mainRoot, ...freeNodeTrees] = root.children
+    if (rootText) {
+      mainRoot.data.text = rootText
     }
+    mainRoot.data.freeNodeTrees = freeNodeTrees
+    return mainRoot
   }
   return root.children[0]
 }

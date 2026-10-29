@@ -49,7 +49,7 @@ class Base {
 
   // 检查当前来源是否需要重新计算节点大小
   checkIsNeedResizeSources() {
-    return this.renderer.checkHasRenderSource(CONSTANTS.CHANGE_THEME)
+    return this.renderer.forceResize || this.renderer.checkHasRenderSource([CONSTANTS.CHANGE_THEME, CONSTANTS.CHANGE_LAYOUT])
   }
 
   // 层级类型改变
@@ -73,12 +73,13 @@ class Base {
       lastData = typeof lastData === 'string' ? JSON.parse(lastData) : lastData
       lastData.isActive = curData.isActive
       lastData.expand = curData.expand
-      lastData = JSON.stringify(lastData)
     } else {
       // 只在都有数据时才进行对比
       return false
     }
-    return lastData !== JSON.stringify(curData)
+    delete lastData.freeNodeTrees
+    const { freeNodeTrees, ...current } = curData
+    return JSON.stringify(lastData) !== JSON.stringify(current)
   }
 
   // 检查库前置或后置内容是否改变了
@@ -193,7 +194,7 @@ class Base {
       // 也可以直接复用
       newNode = this.lru.get(uid) || this.renderer.lastNodeCache[uid]
       // 保存该节点上一次的数据
-      const lastData = JSON.stringify(newNode.getData())
+      const { freeNodeTrees, ...lastData } = newNode.getData()
       // 节点层级改变了
       const isLayerTypeChange = this.checkIsLayerTypeChange(
         newNode.layerIndex,
@@ -240,7 +241,7 @@ class Base {
       newNode = new MindMapNode({
         data,
         uid: newUid,
-        renderer: this.renderer,
+        renderer: this.renderer.owner || this.renderer,
         mindMap: this.mindMap,
         draw: this.draw,
         layerIndex,
@@ -254,6 +255,10 @@ class Base {
       // 数据关联实际节点
       data._node = newNode
     }
+    newNode._layout = this
+    newNode._treeContext = this.renderer
+    newNode.isRoot = isRoot
+    newNode.parent = isRoot ? null : parent._node
     // 如果该节点数据是已激活状态，那么添加到激活节点列表里
     if (data.data.isActive) {
       this.renderer.addNodeToActiveList(newNode)

@@ -59,7 +59,7 @@ function showQuickCreateChildBtn() {
   }
   this._showQuickCreateChildBtn = true
   // 更新按钮
-  this.renderer.layout.renderExpandBtn(this, this._quickCreateChildBtn)
+  this.getLayout().renderExpandBtn(this, this._quickCreateChildBtn)
 }
 
 //  移除按钮

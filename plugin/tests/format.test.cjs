@@ -155,3 +155,10 @@ test('textdata 正文中的标题和围栏不改变四段结构识别', () => {
   assert.equal(isMindMapDocument(raw), true)
   assert.deepEqual(parseDocument(raw).data, data)
 })
+
+
+test('游离树只允许挂在主根，防止保存不可见的嵌套游离数据', () => {
+  const data = structuredClone(sourceData)
+  data.root.children[0].data.freeNodeTrees = [{ data: { text: '不可见树' }, children: [] }]
+  assert.throws(() => createDocument(data), /游离树只能挂在主根/)
+})

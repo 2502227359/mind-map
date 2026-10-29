@@ -567,6 +567,12 @@ export const downTypeList = [
     desc: 'XMind software file'
   },
   {
+    name: 'FreeMind',
+    type: 'mm',
+    icon: 'iconwenjian',
+    desc: 'FreeMind .mm format with node hierarchy, links, and notes'
+  },
+  {
     name: 'Txt',
     type: 'txt',
     icon: 'iconTXT',
@@ -577,6 +583,12 @@ export const downTypeList = [
     type: 'json',
     icon: 'iconjson',
     desc: 'Popular data exchange format that can be used for re importing'
+  },
+  {
+    name: 'Excel',
+    type: 'xlsx',
+    icon: 'iconjson',
+    desc: 'Excel workbook with node hierarchy, links, and notes'
   },
   {
     name: 'HTML (static)',

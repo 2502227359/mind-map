@@ -49,31 +49,37 @@ class NodeBase64ImageStorage {
       })
     }
 
-    walk(renderTree, null, node => {
-      const image = node.data.image
-      if (image) {
-        // 如果是base64图片url
-        if (this.isBase64ImgUrl(image)) {
-          // 检查该图片是否已存在
-          const hasId = getImgId(image)
-          if (hasId) {
-            // 已存在则直接使用现有的key
-            useIds.push(hasId)
-            node.data.image = hasId
-          } else {
-            // 不存在则生成key，并存储
-            const newId = this.createImageKey()
-            node.data.image = newId
-            imgMap[newId] = image
-            useIds.push(newId)
-          }
-        } else if (this.isImageKey(image)) {
-          // 如果是key，那么收集一下
-          if (getImgIds().includes(image)) {
-            useIds.push(image)
+    const roots = [
+      renderTree,
+      ...((renderTree.data && renderTree.data.freeNodeTrees) || [])
+    ]
+    roots.forEach(root => {
+      walk(root, null, node => {
+        const image = node.data.image
+        if (image) {
+          // 如果是base64图片url
+          if (this.isBase64ImgUrl(image)) {
+            // 检查该图片是否已存在
+            const hasId = getImgId(image)
+            if (hasId) {
+              // 已存在则直接使用现有的key
+              useIds.push(hasId)
+              node.data.image = hasId
+            } else {
+              // 不存在则生成key，并存储
+              const newId = this.createImageKey()
+              node.data.image = newId
+              imgMap[newId] = image
+              useIds.push(newId)
+            }
+          } else if (this.isImageKey(image)) {
+            // 如果是key，那么收集一下
+            if (getImgIds().includes(image)) {
+              useIds.push(image)
+            }
           }
         }
-      }
+      })
     })
 
     // 删除已无节点引用的图片

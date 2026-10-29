@@ -6,7 +6,10 @@ import OrganizationStructure from '../../layouts/OrganizationStructure'
 import Timeline from '../../layouts/Timeline'
 import VerticalTimeline from '../../layouts/VerticalTimeline'
 import Fishbone from '../../layouts/Fishbone'
+import RightFishbone from '../../layouts/RightFishbone'
+import Table from '../../layouts/Table'
 import TextEdit from './TextEdit'
+import { renderForest } from './renderForest'
 import {
   copyNodeTree,
   simpleDeepClone,
@@ -39,6 +42,7 @@ import {
 } from '../../utils'
 import { shapeList } from './node/Shape'
 import { lineStyleProps } from '../../theme/default'
+import { collectLevelNodes, collectDescendantNodes, applyNodeSelection } from './selection'
 import { CONSTANTS, ERROR_TYPES } from '../../constants/constant'
 import { Polygon } from '@svgdotjs/svg.js'
 
@@ -67,7 +71,10 @@ const layouts = {
   // 鱼骨图
   [CONSTANTS.LAYOUT.FISHBONE]: Fishbone,
   // 鱼骨图2
-  [CONSTANTS.LAYOUT.FISHBONE2]: Fishbone
+  [CONSTANTS.LAYOUT.FISHBONE2]: Fishbone,
+  [CONSTANTS.LAYOUT.RIGHT_FISHBONE]: RightFishbone,
+  [CONSTANTS.LAYOUT.RIGHT_FISHBONE2]: RightFishbone,
+  [CONSTANTS.LAYOUT.TABLE]: Table
 }
 
 //  渲染
@@ -132,6 +139,8 @@ class Render {
       this.mindMap.opt.layout = CONSTANTS.LAYOUT.LOGICAL_STRUCTURE
     }
     this.layout = new L(this, layout)
+    this.layout.layout = layout
+    this.forceResize = true
   }
 
   // 重新设置思维导图数据
@@ -229,7 +238,10 @@ class Render {
 
   // 强制渲染节点，不考虑是否在画布可视区域内
   forceLoadNode(node) {
-    node = node || this.root
+    if (!node) {
+      this.getAllRenderRoot().forEach(root => this.forceLoadNode(root))
+      return
+    }
     if (node) {
       this.mindMap.emit('node_tree_render_start')
       node.render(() => {
@@ -243,6 +255,14 @@ class Render {
     // 全选
     this.selectAll = this.selectAll.bind(this)
     this.mindMap.command.add('SELECT_ALL', this.selectAll)
+    ;[
+      ['SELECT_ONE_LEVEL', 'selectOneLevel'],
+      ['SELECT_SELF_AND_CHILDREN', 'selectSelfAndChildren'],
+      ['SELECT_CHILDREN', 'selectChildren']
+    ].forEach(([command, method]) => {
+      this[method] = this[method].bind(this)
+      this.mindMap.command.add(command, this[method])
+    })
     // 回退
     this.back = this.back.bind(this)
     this.mindMap.command.add('BACK', this.back)
@@ -509,6 +529,7 @@ class Render {
   // 清空节点缓存池
   clearCache() {
     this.layout.lru.clear()
+    ;(this.freeTreeContexts || []).forEach(context => context.layout.lru.clear())
     this.nodeCache = {}
     this.lastNodeCache = {}
   }
@@ -558,6 +579,7 @@ class Render {
 
   // 渲染
   render(callback, source) {
+    if (this.disposed) return
     this.addRenderParams(callback, source)
     clearTimeout(this.renderTimer)
     this.renderTimer = setTimeout(() => {
@@ -567,6 +589,7 @@ class Render {
 
   // 真正的渲染
   _render() {
+    if (this.disposed) return
     // 切换主题时，被收起的节点需要添加样式复位的标注
     if (this.checkHasRenderSource(CONSTANTS.CHANGE_THEME)) {
       this.resetUnExpandNodeStyle()
@@ -591,32 +614,7 @@ class Render {
       return
     }
     this.mindMap.emit('node_tree_render_start')
-    // 计算布局
-    this.root = null
-    this.layout.doLayout(root => {
-      // 删除本次渲染时不再需要的节点
-      Object.keys(this.lastNodeCache).forEach(uid => {
-        if (!this.nodeCache[uid]) {
-          // 从激活节点列表里删除
-          this.removeNodeFromActiveList(this.lastNodeCache[uid])
-          this.emitNodeActiveEvent()
-          // 调用节点的销毁方法
-          this.lastNodeCache[uid].destroy()
-        }
-      })
-      // 更新根节点
-      this.root = root
-      // 渲染节点
-      this.root.render(() => {
-        this.isRendering = false
-        if (this.hasWaitRendering) {
-          this.hasWaitRendering = false
-          this.render()
-          return
-        }
-        this.onRenderEnd()
-      })
-    })
+    renderForest(this, layouts)
     this.emitNodeActiveEvent()
   }
 
@@ -630,7 +628,7 @@ class Render {
   // 给当前被收起来的节点数据添加更新标志
   resetUnExpandNodeStyle() {
     if (!this.renderTree) return
-    walk(this.renderTree, null, node => {
+    this.getAllRenderTree().forEach(root => walk(root, null, node => {
       if (!node.data.expand) {
         walk(node, null, node2 => {
           // 主要是触发数据新旧对比，不一样则会重新创建节点
@@ -638,7 +636,7 @@ class Render {
         })
         return true
       }
-    })
+    }))
   }
 
   //  清除当前所有激活节点，并会触发事件
@@ -711,10 +709,56 @@ class Render {
   }
 
   //  全选
+  selectOneLevel(level) {
+    applyNodeSelection(this, collectLevelNodes(this.getAllRenderRoot(), level))
+  }
+
+  selectSelfAndChildren() {
+    applyNodeSelection(this, collectDescendantNodes([...this.activeNodeList]))
+  }
+
+  selectChildren() {
+    applyNodeSelection(this, collectDescendantNodes([...this.activeNodeList], false, true))
+  }
+
+  getAllRenderRoot() {
+    return [this.root, ...(this.freeTreeContexts || []).map(context => context.root)].filter(Boolean)
+  }
+
+  walkAll(parent, callback, ...rest) {
+    this.getAllRenderRoot().forEach(root => walk(root, parent, callback, ...rest))
+  }
+
+  bfsWalkAll(callback) {
+    this.getAllRenderRoot().forEach(root => bfsWalk(root, callback))
+  }
+
+  removeNodeData(node) {
+    if (node === this.root) return false
+    const trees = this.renderTree.data.freeNodeTrees || []
+    const freeIndex = trees.findIndex(tree => tree.data.uid === node.uid)
+    if (freeIndex !== -1) trees.splice(freeIndex, 1)
+    else {
+      const siblings = node.parent?.nodeData.children || []
+      const index = siblings.findIndex(tree => tree.data.uid === node.uid)
+      if (index === -1) return false
+      siblings.splice(index, 1)
+    }
+    if (node.parent) node.parent.children = node.parent.children.filter(child => child.uid !== node.uid)
+    node.parent = null
+    node.isRoot = false
+    return true
+  }
+
+  getAllRenderTree() {
+    const free = this.renderTree?.data?.freeNodeTrees || []
+    return [this.renderTree, ...free].filter(Boolean)
+  }
+
   selectAll() {
     if (this.mindMap.opt.readonly) return
-    walk(
-      this.root,
+    this.getAllRenderRoot().forEach(root => walk(
+      root,
       null,
       node => {
         if (!node.getData('isActive')) {
@@ -734,7 +778,7 @@ class Render {
       true,
       0,
       0
-    )
+    ))
     this.emitNodeActiveEvent()
   }
 
@@ -1200,7 +1244,7 @@ class Render {
     } else {
       // 否则遍历整棵树
       if (!this.renderTree) return
-      walk(this.renderTree, null, node => {
+      this.getAllRenderTree().forEach(root => walk(root, null, node => {
         const _hasCustomStyles = this._handleRemoveCustomStyles(node.data)
         if (_hasCustomStyles) hasCustomStyles = true
         // 不要忘记概要节点
@@ -1212,7 +1256,7 @@ class Render {
             if (_hasCustomStyles) hasCustomStyles = true
           })
         }
-      })
+      }))
     }
     if (hasCustomStyles) {
       this.mindMap.reRender()
@@ -1403,23 +1447,26 @@ class Render {
 
   // 将节点移动到另一个节点的前面或后面
   insertTo(node, exist, dir = 'before') {
+    if (exist === this.root) return this.moveNodeTo(node, exist)
+    if (exist.isRoot) return this.insertRootTo(node, exist, dir)
     let nodeList = formatDataToArray(node)
     nodeList = nodeList.filter(item => {
-      return !item.isRoot
+      return item !== this.root
     })
     if (dir === 'after') {
       nodeList.reverse()
     }
     nodeList.forEach(item => {
-      // 移动节点
-      let nodeParent = item.parent
-      let nodeBorthers = nodeParent.children
-      let nodeIndex = getNodeIndexInNodeList(item, nodeBorthers)
-      if (nodeIndex === -1) {
-        return
+      let ancestor = exist
+      while (ancestor) {
+        if (ancestor === item) return
+        ancestor = ancestor.parent
       }
-      nodeBorthers.splice(nodeIndex, 1)
-      nodeParent.nodeData.children.splice(nodeIndex, 1)
+      if (!this.removeNodeData(item)) return
+      delete item.nodeData.data.customLeft
+      delete item.nodeData.data.customTop
+      item.customLeft = undefined
+      item.customTop = undefined
 
       // 目标节点
       let existParent = exist.parent
@@ -1431,8 +1478,26 @@ class Render {
       if (dir === 'after') {
         existIndex++
       }
+      item.parent = existParent
       existBorthers.splice(existIndex, 0, item)
       existParent.nodeData.children.splice(existIndex, 0, item.nodeData)
+    })
+    this.mindMap.render()
+  }
+
+  // 游离根的同级顺序同时用于大纲与多树导出。
+  insertRootTo(nodes, exist, dir) {
+    const trees = this.renderTree.data.freeNodeTrees || []
+    const list = getTopAncestorsFomNodeList(formatDataToArray(nodes))
+    if (dir === 'after') list.reverse()
+    list.filter(node => node !== this.root && node !== exist).forEach(node => {
+      const position = { customLeft: node.left, customTop: node.top }
+      const layout = node.getLayout().layout
+      if (!this.removeNodeData(node)) return
+      Object.assign(node.nodeData.data, position, { layout })
+      node.isRoot = true
+      const index = trees.findIndex(tree => tree.data.uid === exist.uid)
+      trees.splice(index + (dir === 'after' ? 1 : 0), 0, node.nodeData)
     })
     this.mindMap.render()
   }
@@ -1447,9 +1512,19 @@ class Render {
     let needActiveNode = null
     let isAppointNodes = appointNodes.length > 0
     let list = isAppointNodes ? appointNodes : this.activeNodeList
-    let root = list.find(node => {
-      return node.isRoot
-    })
+    const freeRoots = list.filter(node => node.isRoot && node !== this.root)
+    if (freeRoots.length) {
+      this.renderTree.data.freeNodeTrees = (this.renderTree.data.freeNodeTrees || [])
+        .filter(tree => !freeRoots.some(node => node.uid === tree.data.uid))
+      list = list.filter(node => !freeRoots.includes(node))
+      this.activeNodeList = this.activeNodeList.filter(node => !freeRoots.includes(node))
+      if (!list.length) {
+        this.emitNodeActiveEvent()
+        this.mindMap.render()
+        return
+      }
+    }
+    let root = list.find(node => node === this.root)
     if (root) {
       this.clearActiveNodeList()
       root.children = []
@@ -1615,17 +1690,25 @@ class Render {
 
   //  移动节点作为另一个节点的子节点
   moveNodeTo(node, toNode) {
-    let nodeList = formatDataToArray(node)
-    nodeList = nodeList.filter(item => {
-      return !item.isRoot
-    })
-    nodeList.forEach(item => {
+    const nodeList = getTopAncestorsFomNodeList(formatDataToArray(node))
+    nodeList.filter(item => item !== this.root).forEach(item => {
+      // 跨树移动同样禁止把祖先接到自己的后代，防止生成循环数据。
+      let ancestor = toNode
+      while (ancestor) {
+        if (ancestor === item) return
+        ancestor = ancestor.parent
+      }
       this.removeNodeFromActiveList(item)
-      removeFromParentNodeData(item)
-      toNode.setData({
-        expand: true
-      })
+      if (!this.removeNodeData(item)) return
+      delete item.nodeData.data.customLeft
+      delete item.nodeData.data.customTop
+      delete item.nodeData.data.layout
+      item.customLeft = undefined
+      item.customTop = undefined
+      toNode.nodeData.data.expand = true
       toNode.nodeData.children.push(item.nodeData)
+      toNode.children.push(item)
+      item.parent = toNode
     })
     this.emitNodeActiveEvent()
     this.mindMap.render()
@@ -1700,7 +1783,7 @@ class Render {
         })
       }
     }
-    _walk(this.renderTree, !uid)
+    this.getAllRenderTree().forEach(root => _walk(root, !uid))
 
     this.mindMap.render()
   }
@@ -1728,7 +1811,7 @@ class Render {
         })
       }
     }
-    _walk(this.renderTree, true, !uid)
+    this.getAllRenderTree().forEach(root => _walk(root, true, !uid))
 
     this.mindMap.render(() => {
       if (isSetRootNodeCenter) {
@@ -1949,39 +2032,33 @@ class Render {
 
   //  设置节点自定义位置
   setNodeCustomPosition(node, left = undefined, top = undefined) {
-    let nodeList = [node] || this.activeNodeList
-    nodeList.forEach(item => {
-      this.mindMap.execCommand('SET_NODE_DATA', item, {
-        customLeft: left,
-        customTop: top
-      })
+    if (this.mindMap.opt.readonly) return
+    const nodes = node ? formatDataToArray(node) : this.activeNodeList
+    nodes.forEach(item => {
+      this.mindMap.execCommand('SET_NODE_DATA', item, { customLeft: left, customTop: top })
+      item.customLeft = left
+      item.customTop = top
     })
+    this.mindMap.render()
   }
 
   //  一键整理布局，即去除自定义位置
   resetLayout() {
-    walk(
-      this.root,
-      null,
-      node => {
-        node.customLeft = undefined
-        node.customTop = undefined
-        this.mindMap.execCommand('SET_NODE_DATA', node, {
-          customLeft: undefined,
-          customTop: undefined
-        })
-        this.mindMap.render()
-      },
-      null,
-      true,
-      0,
-      0
-    )
+    this.walkAll(null, node => {
+      // 保留各游离树的锚点，否则多个独立导图会重叠到主根。
+      if (node.isRoot && node !== this.root) return
+      node.customLeft = undefined
+      node.customTop = undefined
+      this.mindMap.execCommand('SET_NODE_DATA', node, {
+        customLeft: undefined, customTop: undefined
+      })
+    }, null, true)
+    this.mindMap.render()
   }
 
   //  设置节点形状
   setNodeShape(node, shape) {
-    if (!shape || !shapeList.includes(shape)) {
+    if (!shape || (!shapeList.includes(shape) && !this.mindMap.extendShapeList.some(item => item.name === shape))) {
       return
     }
     let nodeList = [node] || this.activeNodeList
@@ -2075,7 +2152,7 @@ class Render {
     let parentsList = []
     let isGeneralization = false
     const cache = {}
-    bfsWalk(this.renderTree, (node, parent) => {
+    this.getAllRenderTree().forEach(root => bfsWalk(root, (node, parent) => {
       if (node.data.uid === uid) {
         parentsList = parent ? [...cache[parent.data.uid], parent] : []
         return 'stop'
@@ -2091,7 +2168,7 @@ class Render {
         return 'stop'
       }
       cache[node.data.uid] = parent ? [...cache[parent.data.uid], parent] : []
-    })
+    }))
     let needRender = false
     parentsList.forEach(node => {
       if (!node.data.expand) {
@@ -2122,7 +2199,7 @@ class Render {
   findNodeByUid(uid) {
     if (!this.root) return
     let res = null
-    walk(this.root, null, node => {
+    this.getAllRenderRoot().forEach(root => walk(root, null, node => {
       if (node.getData('uid') === uid) {
         res = node
         return true
@@ -2138,7 +2215,7 @@ class Render {
       if (isGeneralization) {
         return true
       }
-    })
+    }))
     return res
   }
 

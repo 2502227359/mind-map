@@ -570,6 +570,12 @@ export const downTypeList = [
     desc: 'Định dạng phần mềm XMind'
   },
   {
+    name: 'FreeMind',
+    type: 'mm',
+    icon: 'iconwenjian',
+    desc: 'Định dạng FreeMind .mm với cấu trúc, liên kết và ghi chú'
+  },
+  {
     name: 'Txt',
     type: 'txt',
     icon: 'iconTXT',
@@ -581,6 +587,12 @@ export const downTypeList = [
     icon: 'iconjson',
     desc:
       'Các định dạng trao đổi dữ liệu phổ biến có thể được sử dụng để nhập lại'
+  },
+  {
+    name: 'Excel',
+    type: 'xlsx',
+    icon: 'iconjson',
+    desc: 'Bảng tính Excel với cấu trúc, liên kết và ghi chú'
   },
   {
     name: 'HTML tĩnh',

@@ -110,7 +110,9 @@
 </template>
 
 <script>
+import { markRaw } from 'vue'
 import MindMap from 'simple-mind-map'
+import MindMapNode from 'simple-mind-map/src/core/render/node/MindMapNode.js'
 import MiniMap from 'simple-mind-map/src/plugins/MiniMap.js'
 import Watermark from 'simple-mind-map/src/plugins/Watermark.js'
 import KeyboardNavigation from 'simple-mind-map/src/plugins/KeyboardNavigation.js'
@@ -132,6 +134,20 @@ import DemonstratePlugin from 'simple-mind-map/src/plugins/Demonstrate.js'
 import OuterFrame from 'simple-mind-map/src/plugins/OuterFrame.js'
 import MindMapLayoutPro from 'simple-mind-map/src/plugins/MindMapLayoutPro.js'
 import NodeBase64ImageStorage from 'simple-mind-map/src/plugins/NodeBase64ImageStorage.js'
+import NodeTodo from 'simple-mind-map/src/plugins/NodeTodo.js'
+import NodeNumbers from 'simple-mind-map/src/plugins/NodeNumbers.js'
+import NodeTextNumber from 'simple-mind-map/src/plugins/NodeTextNumber.js'
+import NodeDescription from 'simple-mind-map/src/plugins/NodeDescription.js'
+import NodeLink from 'simple-mind-map/src/plugins/NodeLink.js'
+import NodeNotation from 'simple-mind-map/src/plugins/NodeNotation.js'
+import NodeCallout from 'simple-mind-map/src/plugins/NodeCallout.js'
+import FreeNode from 'simple-mind-map/src/plugins/FreeNode.js'
+import Momentum from 'simple-mind-map/src/plugins/Momentum.js'
+import MoreShapes from 'simple-mind-map/src/plugins/MoreShapes.js'
+import NodeAutoAlign from 'simple-mind-map/src/plugins/NodeAutoAlign.js'
+import LazyLoadImg from 'simple-mind-map/src/plugins/LazyLoadImg.js'
+import LineFlow from 'simple-mind-map/src/plugins/LineFlow.js'
+import HandDrawnLikeStyle from 'simple-mind-map/src/plugins/HandDrawnLikeStyle.js'
 import Themes from 'simple-mind-map-plugin-themes'
 import { isSameObject, getImageSize } from 'simple-mind-map/src/utils/index.js'
 import OutlineSidebar from './OutlineSidebar.vue'
@@ -178,6 +194,11 @@ import RainbowRefreshBtn from './RainbowRefreshBtn.vue'
 import { imgFail, obFileHyperlinkIcon, hyperlinkIcon } from '@/config/icons'
 import imgHostingUpload from '@/mixins/imgHostingUpload'
 
+// 引擎和节点持有 SVG PathArray 等对象，Vue 深度观察会改写其数组原型。
+// UI 仍通过现有事件和独立配置对象刷新，不观察图形运行时内部状态。
+markRaw(MindMap.prototype)
+markRaw(MindMapNode.prototype)
+
 MindMap.usePlugin(MiniMap)
   .usePlugin(Watermark)
   .usePlugin(Drag)
@@ -197,6 +218,20 @@ MindMap.usePlugin(MiniMap)
   .usePlugin(OuterFrame)
   .usePlugin(MindMapLayoutPro)
   .usePlugin(NodeBase64ImageStorage)
+  .usePlugin(NodeTodo)
+  .usePlugin(NodeNumbers)
+  .usePlugin(NodeTextNumber)
+  .usePlugin(NodeDescription)
+  .usePlugin(NodeLink)
+  .usePlugin(NodeNotation)
+  .usePlugin(NodeCallout)
+  .usePlugin(FreeNode)
+  .usePlugin(Momentum)
+  .usePlugin(MoreShapes)
+  .usePlugin(NodeAutoAlign)
+  .usePlugin(LazyLoadImg)
+  .usePlugin(LineFlow)
+  .usePlugin(HandDrawnLikeStyle)
   .usePlugin(RichText)
 
 Themes.init(MindMap)

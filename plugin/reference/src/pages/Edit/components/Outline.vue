@@ -157,7 +157,7 @@ export default {
           walk(item)
         })
       }
-      this.data = [data, ...data.data.freeNodeTrees]
+      this.data = [data, ...(data.data.freeNodeTrees || [])]
     },
 
     afterCreateNewNode() {

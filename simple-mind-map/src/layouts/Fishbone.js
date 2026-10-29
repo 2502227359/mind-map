@@ -1,5 +1,11 @@
 import Base from './Base'
-import { walk, asyncRun, degToRad, getNodeIndexInNodeList } from '../utils'
+import {
+  walk,
+  asyncRun,
+  degToRad,
+  getNodeIndexInNodeList,
+  createUid
+} from '../utils'
 import { CONSTANTS } from '../constants/constant'
 import utils from './fishboneUtils'
 import { SVG } from '@svgdotjs/svg.js'
@@ -22,6 +28,10 @@ class Fishbone extends Base {
       'M4,181 C4,181, 0,177, 4,173 Q 96.09523809523809,0, 288.2857142857143,0 L 288.2857142857143,354 Q 48.047619047619044,354, 8,218.18367346938777 C8,218.18367346938777, 6,214.18367346938777, 8,214.18367346938777 L 41.183673469387756,214.18367346938777 Z'
     this.fishTailPathStr =
       'M 606.9342905223708 0 Q 713.1342905223709 -177 819.3342905223708 -177 L 766.2342905223709 0 L 819.3342905223708 177 Q 713.1342905223709 177 606.9342905223708 0 z'
+    this.fishTailClassName = `smm-layout-fishbone-tail-${createUid().replace(
+      /-/g,
+      ''
+    )}`
     this.bindEvent()
     this.extendShape()
     this.beforeChange = this.beforeChange.bind(this)
@@ -38,6 +48,18 @@ class Fishbone extends Base {
     return this.layout === CONSTANTS.LAYOUT.FISHBONE2
   }
 
+  getShapeInfo() {
+    return {
+      fishHeadName: 'fishHead',
+      fishHeadPathStr: this.fishHeadPathStr,
+      fishTailPathStr: this.fishTailPathStr
+    }
+  }
+
+  getLineDraw() {
+    return this.renderer.lineDraw || this.lineDraw || this.mindMap.lineDraw
+  }
+
   bindEvent() {
     if (!this.isFishbone2()) return
     this.onCheckUpdateFishTail = this.onCheckUpdateFishTail.bind(this)
@@ -45,17 +67,20 @@ class Fishbone extends Base {
   }
 
   unBindEvent() {
-    this.mindMap.off('afterExecCommand', this.onCheckUpdateFishTail)
+    if (this.onCheckUpdateFishTail) {
+      this.mindMap.off('afterExecCommand', this.onCheckUpdateFishTail)
+    }
   }
 
   // 扩展节点形状
   extendShape() {
     if (!this.isFishbone2()) return
+    const { fishHeadName, fishHeadPathStr } = this.getShapeInfo()
     // 扩展鱼头形状
     this.mindMap.addShape({
-      name: 'fishHead',
+      name: fishHeadName,
       createShape: node => {
-        const rect = SVG(`<path d="${this.fishHeadPathStr}"></path>`)
+        const rect = SVG(`<path d="${fishHeadPathStr}"></path>`)
         const { width, height } = node.shapeInstance.getNodeSize()
         rect.size(width, height)
         return rect
@@ -94,16 +119,22 @@ class Fishbone extends Base {
         callback(this.root)
       }
     ]
-    asyncRun(task)
+    asyncRun(task, undefined, () => !this.mindMap._isDestroyed && !this.renderer.disposed)
   }
 
   // 创建鱼尾
   addFishTail() {
     if (!this.isFishbone2()) return
-    const exist = this.mindMap.lineDraw.findOne('.smm-layout-fishbone-tail')
+    const lineDraw = this.getLineDraw()
+    if (!this.root || !this.root.children || this.root.children.length <= 0) {
+      this.removeFishTail()
+      return
+    }
+    const exist = lineDraw.findOne(`.${this.fishTailClassName}`)
     if (!exist) {
-      this.fishTail = SVG(`<path d="${this.fishTailPathStr}"></path>`)
-      this.fishTail.addClass('smm-layout-fishbone-tail')
+      const { fishTailPathStr } = this.getShapeInfo()
+      this.fishTail = SVG(`<path d="${fishTailPathStr}"></path>`)
+      this.fishTail.addClass(this.fishTailClassName)
     } else {
       this.fishTail = exist
     }
@@ -111,7 +142,7 @@ class Fishbone extends Base {
     const tailWidth = tailHeight * this.tailRatio
     this.fishTail.size(tailWidth, tailHeight)
     this.styleFishTail()
-    this.mindMap.lineDraw.add(this.fishTail)
+    lineDraw.add(this.fishTail)
   }
 
   // 如果根节点更新了形状样式，那么鱼尾也要更新
@@ -130,20 +161,23 @@ class Fishbone extends Base {
   }
 
   styleFishTail() {
-    this.root.style.shape(this.fishTail)
+    if (this.root && this.fishTail) {
+      this.root.style.shape(this.fishTail)
+    }
   }
 
   // 删除鱼尾
   removeFishTail() {
-    const exist = this.mindMap.lineDraw.findOne('.smm-layout-fishbone-tail')
+    const exist = this.getLineDraw().findOne(`.${this.fishTailClassName}`)
     if (exist) {
       exist.remove()
     }
+    this.fishTail = null
   }
 
   // 更新鱼尾形状位置
   updateFishTailPosition() {
-    if (!this.isFishbone2()) return
+    if (!this.isFishbone2() || !this.fishTail || !this.root) return
     this.fishTail.x(this.maxx).cy(this.root.top + this.root.height / 2)
   }
 
@@ -155,7 +189,7 @@ class Fishbone extends Base {
       (node, parent, isRoot, layerIndex, index, ancestors) => {
         if (isRoot && this.isFishbone2()) {
           // 将根节点形状强制修改为鱼头
-          node.data.shape = 'fishHead'
+          node.data.shape = this.getShapeInfo().fishHeadName
         }
         // 创建节点
         let newNode = this.createNode(
@@ -557,10 +591,11 @@ class Fishbone extends Base {
   beforeChange() {
     // 删除鱼尾
     if (!this.isFishbone2()) return
-    this.root.nodeData.data.shape = CONSTANTS.SHAPE.RECTANGLE
+    if (this.root && this.root.nodeData && this.root.nodeData.data) {
+      this.root.nodeData.data.shape = CONSTANTS.SHAPE.RECTANGLE
+    }
     this.removeFishTail()
     this.unBindEvent()
-    this.mindMap.removeShape('fishHead')
   }
 }
 

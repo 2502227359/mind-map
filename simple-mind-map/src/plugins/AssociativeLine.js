@@ -226,8 +226,7 @@ class AssociativeLine {
     if (!tree) return
     let idToNode = new Map()
     let nodeToIds = new Map()
-    walk(
-      tree,
+    this.mindMap.renderer.walkAll(
       null,
       cur => {
         if (!cur) return
@@ -570,7 +569,7 @@ class AssociativeLine {
   // 检测当前移动到的目标节点
   checkOverlapNode(x, y) {
     this.overlapNode = null
-    bfsWalk(this.mindMap.renderer.root, node => {
+    this.mindMap.renderer.bfsWalkAll( node => {
       if (node.getData('isActive')) {
         this.mindMap.execCommand('SET_NODE_ACTIVE', node, false)
       }

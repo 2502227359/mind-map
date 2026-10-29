@@ -26,7 +26,7 @@ class Timeline extends Base {
         callback(this.root)
       }
     ]
-    asyncRun(task)
+    asyncRun(task, undefined, () => !this.mindMap._isDestroyed && !this.renderer.disposed)
   }
 
   //  遍历数据创建节点、计算根节点的位置，计算根节点的子节点的top值

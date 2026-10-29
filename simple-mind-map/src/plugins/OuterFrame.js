@@ -256,8 +256,7 @@ class OuterFrame {
     if (!tree) return
     const t = this.mindMap.draw.transform()
     const { outerFramePaddingX, outerFramePaddingY } = this.mindMap.opt
-    walk(
-      tree,
+    this.mindMap.renderer.walkAll(
       null,
       cur => {
         if (!cur) return

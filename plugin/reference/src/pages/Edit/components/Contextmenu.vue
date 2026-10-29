@@ -92,6 +92,163 @@
           <div class="item" @click="selectNodes('children')">子节点</div>
         </div>
       </div>
+      <div class="item withSubItems">
+        <div class="itemRow">
+          <span class="name">节点功能</span>
+          <span class="el-icon-arrow-right"></span>
+        </div>
+        <div
+          class="subItems contextmenuListBox featureMenu"
+          :class="{ isDark: isDark, showLeft: subItemsShowLeft }"
+          style="top: -10px"
+        >
+          <div class="item" @click="toggleTodo">
+            <span class="name">{{ hasCheckbox ? '删除待办' : '添加待办' }}</span>
+          </div>
+          <div class="item" @click="setTodoDone(true)">
+            <span class="name">标记待办完成</span>
+          </div>
+          <div class="item" @click="setTodoDone(false)">
+            <span class="name">标记待办未完成</span>
+          </div>
+          <div class="item withSubItems">
+            <div class="itemRow">
+              <span class="name">子节点待办</span>
+              <span class="el-icon-arrow-right"></span>
+            </div>
+            <div
+              class="subItems contextmenuListBox featureMenu"
+              :class="{ isDark: isDark, showLeft: subItemsShowLeft }"
+              style="top: -10px"
+            >
+              <div class="item" @click="setChildrenTodo('add')">添加待办</div>
+              <div class="item" @click="setChildrenTodo('complete')">
+                全部标记完成
+              </div>
+              <div class="item" @click="setChildrenTodo('unComplete')">
+                全部标记未完成
+              </div>
+              <div class="item" @click="setChildrenTodo('delete')">
+                删除子节点待办
+              </div>
+            </div>
+          </div>
+          <div class="item withSubItems">
+            <div class="itemRow">
+              <span class="name">子节点编号</span>
+              <span class="el-icon-arrow-right"></span>
+            </div>
+            <div
+              class="subItems contextmenuListBox featureMenu numberMenu"
+              :class="{ isDark: isDark, showLeft: subItemsShowLeft }"
+              style="top: -10px"
+            >
+              <div
+                class="item"
+                v-for="item in numberTypes"
+                :key="'node-number-' + item.value"
+                @click="setNodeNumber(item.value)"
+              >
+                {{ item.name }}
+              </div>
+              <div class="item withSubItems">
+                <div class="itemRow">
+                  <span class="name">编号层级</span>
+                  <span class="el-icon-arrow-right"></span>
+                </div>
+                <div
+                  class="subItems contextmenuListBox featureMenu"
+                  :class="{ isDark: isDark, showLeft: subItemsShowLeft }"
+                  style="top: -10px"
+                >
+                  <div
+                    class="item"
+                    v-for="item in numberLevels"
+                    :key="'node-number-level-' + item.value"
+                    @click="setNodeNumber(numberType || 1, item.value)"
+                  >
+                    {{ item.name }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="item withSubItems">
+            <div class="itemRow">
+              <span class="name">节点内段落编号</span>
+              <span class="el-icon-arrow-right"></span>
+            </div>
+            <div
+              class="subItems contextmenuListBox featureMenu numberMenu"
+              :class="{ isDark: isDark, showLeft: subItemsShowLeft }"
+              style="top: -10px"
+            >
+              <div
+                class="item"
+                v-for="item in paragraphNumberTypes"
+                :key="'paragraph-number-' + item.value"
+                @click="setParagraphNumber(item.value)"
+              >
+                {{ item.name }}
+              </div>
+            </div>
+          </div>
+          <div class="item" @click="openDescriptionDialog">
+            <span class="name">编辑节点描述</span>
+          </div>
+          <div class="item" @click="toggleHideText">
+            <span class="name">{{ isTextHidden ? '显示节点正文' : '隐藏节点正文' }}</span>
+          </div>
+          <div class="item" @click="openCalloutDialog">
+            <span class="name">{{ hasCallout ? '编辑标注气泡' : '添加标注气泡' }}</span>
+          </div>
+          <div class="item" v-if="hasCallout" @click="removeCallout">
+            <span class="name">删除标注气泡</span>
+          </div>
+          <div class="item withSubItems">
+            <div class="itemRow">
+              <span class="name">圈画标记</span>
+              <span class="el-icon-arrow-right"></span>
+            </div>
+            <div
+              class="subItems contextmenuListBox featureMenu"
+              :class="{ isDark: isDark, showLeft: subItemsShowLeft }"
+              style="top: -10px"
+            >
+              <div class="item" @click="openNotationDialog">添加/编辑圈画</div>
+              <div class="item" v-if="hasNotation" @click="removeNotation">
+                删除圈画标记
+              </div>
+            </div>
+          </div>
+          <div class="item" @click="openNodeLinkDialog">
+            <span class="name">{{ hasNodeLink ? '修改节点跳转' : '链接到指定节点' }}</span>
+          </div>
+          <div class="item" v-if="hasNodeLink" @click="jumpToNodeLink">
+            <span class="name">跳转到链接节点</span>
+          </div>
+          <div class="item" v-if="hasNodeLink" @click="removeNodeLink">
+            <span class="name">删除节点跳转</span>
+          </div>
+          <div
+            class="item"
+            :class="{ disabled: isReadonly }"
+            @click="exec('TO_SAME_LAYERINDEX_NODE_ALIGN', isReadonly)"
+          >
+            <span class="name">一键同级节点对齐</span>
+          </div>
+          <div
+            class="item"
+            :class="{ disabled: isReadonly }"
+            @click="exec('REMOVE_SAME_LAYERINDEX_NODE_ALIGN', isReadonly)"
+          >
+            <span class="name">取消同级节点自动宽度</span>
+          </div>
+          <div class="item" @click="exec('TO_FREE_NODE')">
+            <span class="name">转为游离主题</span>
+          </div>
+        </div>
+      </div>
       <div class="splitLine"></div>
       <div class="item danger" @click="exec('REMOVE_NODE')">
         <span class="name">{{ $t('contextmenu.deleteNode') }}</span>
@@ -188,6 +345,9 @@
       </div>
       <div class="item" @click="exec('UNEXPAND_ALL')">
         <span class="name">{{ $t('contextmenu.unExpandAll') }}</span>
+      </div>
+      <div class="item" @click="exec('INSERT_FREE_NODE', false, {}, {})">
+        <span class="name">插入游离主题</span>
       </div>
       <div class="item withSubItems">
         <div class="itemRow">
@@ -287,6 +447,14 @@
         <span class="name">{{ $t('contextmenu.copyAsInternalUrl') }}</span>
       </div>
     </template>
+    <NodeFeatures
+      v-if="type === 'node' && node"
+      ref="nodeFeatures"
+      :mind-map="mindMap"
+      :node="node"
+      :is-dark="isDark"
+      @close="hide"
+    ></NodeFeatures>
   </div>
 </template>
 
@@ -300,8 +468,12 @@ import {
 import { transformToMarkdown } from 'simple-mind-map/src/parse/toMarkdown'
 import txt from '@/utils/txt'
 import { setDataToClipboard, setImgToClipboard, copy } from '@/utils'
+import NodeFeatures from './NodeFeatures.vue'
 
 export default {
+  components: {
+    NodeFeatures
+  },
   props: {
     mindMap: {
       type: Object
@@ -323,7 +495,24 @@ export default {
       subItemsShowLeft: false,
       isNodeMousedown: false,
       linesHidden: false,
-      listBoxWidth: '250px'
+      listBoxWidth: '250px',
+      numberTypes: [
+        { name: '无编号', value: '' },
+        { name: '1, 2, 3', value: 1 },
+        { name: '1., 2., 3.', value: 2 },
+        { name: '(1), (2), (3)', value: 3 },
+        { name: 'a., b., c.', value: 4 },
+        { name: 'A., B., C.', value: 5 },
+        { name: 'i., ii., iii.', value: 6 },
+        { name: 'I., II., III.', value: 7 },
+        { name: '一、, 二、, 三、', value: 8 }
+      ],
+      numberLevels: [
+        { name: '编号首层', value: 1 },
+        { name: '编号前两层', value: 2 },
+        { name: '编号前三层', value: 3 },
+        { name: '编号所有层', value: 0 }
+      ],
     }
   },
   computed: {
@@ -370,6 +559,12 @@ export default {
       }
       return list
     },
+    paragraphNumberTypes() {
+      return [
+        { name: '取消编号', value: '' },
+        ...this.numberTypes.filter(item => item.value !== '')
+      ]
+    },
     insertNodeBtnDisabled() {
       return !this.node || this.node.isRoot || this.node.isGeneralization
     },
@@ -404,6 +599,22 @@ export default {
     hasNote() {
       return !!this.node.getData('note')
     },
+    hasCheckbox() {
+      return !!this.node.getData('checkbox')
+    },
+    hasCallout() {
+      return !!this.node.getData('chatDialog')
+    },
+    hasNodeLink() {
+      return !!this.node.getData('nodeLink')
+    },
+    hasNotation() {
+      const notation = this.node.getData('notation')
+      return Boolean(notation && notation.show)
+    },
+    isTextHidden() {
+      return Boolean(this.node.getData('hideText'))
+    },
     hasCustomTextWidth() {
       return this.node.hasCustomWidth()
     },
@@ -429,6 +640,10 @@ export default {
     }
   },
   created() {
+    if (this.mindMap) {
+      this.mindMap.on('chat_dialog_dblclick', this.onChatDialogDblclick)
+      this.mindMap.on('node_link_not_find', this.onNodeLinkNotFind)
+    }
     this.$root.$bus.$on('node_contextmenu', this.show)
     this.$root.$bus.$on('node_click', this.hide)
     this.$root.$bus.$on('draw_click', this.hide)
@@ -443,6 +658,10 @@ export default {
     }
   },
   beforeDestroy() {
+    if (this.mindMap) {
+      this.mindMap.off('chat_dialog_dblclick', this.onChatDialogDblclick)
+      this.mindMap.off('node_link_not_find', this.onNodeLinkNotFind)
+    }
     this.$root.$bus.$off('node_contextmenu', this.show)
     this.$root.$bus.$off('node_click', this.hide)
     this.$root.$bus.$off('draw_click', this.hide)
@@ -487,15 +706,55 @@ export default {
       this.isShow = true
       this.node = node
       const number = this.node.getData('number')
-      if (number) {
-        this.numberType = number.type || 1
-        this.numberLevel = number.level === '' ? 1 : number.level
-      }
+      this.numberType = number ? number.type || 1 : ''
+      this.numberLevel = number
+        ? number.level === ''
+          ? 1
+          : number.level
+        : ''
       this.$nextTick(() => {
         const { x, y } = this.getShowPosition(e.clientX + 10, e.clientY + 10)
         this.left = x
         this.top = y
       })
+    },
+
+    onChatDialogDblclick(e, node) {
+      if (
+        !node ||
+        this.isReadonly ||
+        (this.mindMap && this.mindMap.opt && this.mindMap.opt.readonly)
+      ) {
+        return
+      }
+      const event = e || {}
+      this.show(
+        {
+          clientX: Number.isFinite(event.clientX) ? event.clientX : 10,
+          clientY: Number.isFinite(event.clientY) ? event.clientY : 10
+        },
+        node
+      )
+      this.$nextTick(() => {
+        if (this.$refs.nodeFeatures) {
+          this.$refs.nodeFeatures.openCalloutDialog()
+        }
+      })
+    },
+
+    onNodeLinkNotFind(node, uid) {
+      const targetUid =
+        uid ||
+        (node && typeof node.getData === 'function'
+          ? node.getData('nodeLink')
+          : '')
+      const target = targetUid ? `：${targetUid}` : ''
+      if (
+        this.$root.$obsidianAPI &&
+        typeof this.$root.$obsidianAPI.showTip === 'function'
+      ) {
+        this.$root.$obsidianAPI.showTip(`未找到目标节点${target}`)
+      }
     },
 
     onNodeMousedown() {
@@ -548,6 +807,7 @@ export default {
       this.node = ''
       this.numberType = ''
       this.numberLevel = ''
+      if (this.$refs.nodeFeatures) this.$refs.nodeFeatures.closeAll()
     },
 
     exec(key, disabled, ...args) {
@@ -602,11 +862,9 @@ export default {
           )
           break
         case 'REMOVE_NODE_CUSTOM_TEXT_WIDTH':
-          this.$root.$bus.$emit(
-            'execCommand',
-            'SET_NODE_CUSTOM_TEXT_WIDTH',
-            this.node
-          )
+          this.mindMap.execCommand('SET_NODE_DATA', this.node, {
+            customTextWidth: undefined
+          })
           break
         case 'COPY_TO_OB_LINK':
           const link = this.$root.$obsidianAPI.getObInternalLink()
@@ -624,6 +882,108 @@ export default {
           this.$root.$bus.$emit('execCommand', key, ...args)
           break
       }
+      this.hide()
+    },
+
+    toggleTodo() {
+      this.$root.$bus.$emit(
+        'execCommand',
+        'SET_CHECKBOX',
+        [this.node],
+        this.hasCheckbox ? null : { done: false }
+      )
+      this.hide()
+    },
+
+    setTodoDone(done) {
+      this.$root.$bus.$emit('execCommand', 'SET_CHECKBOX', [this.node], { done })
+      this.hide()
+    },
+
+    setChildrenTodo(action) {
+      this.$root.$bus.$emit('execCommand', 'SET_CHILDREN_TODO', [this.node], action)
+      this.hide()
+    },
+
+    setNodeNumber(type, level) {
+      const value = type === '' ? null : {
+        type,
+        level: level === undefined
+          ? this.numberLevel === ''
+            ? 1
+            : this.numberLevel
+          : level
+      }
+      this.$root.$bus.$emit('execCommand', 'SET_NUMBER', [this.node], value)
+      this.hide()
+    },
+
+    setParagraphNumber(type) {
+      this.$root.$bus.$emit('execCommand', 'SET_NODE_TEXT_NUMBER', [this.node], type)
+      this.hide()
+    },
+
+    openDescriptionDialog() {
+      if (this.$refs.nodeFeatures) this.$refs.nodeFeatures.openDescriptionDialog()
+    },
+
+    toggleHideText() {
+      this.$root.$bus.$emit(
+        'execCommand',
+        'SET_NODE_HIDE_TEXT',
+        [this.node],
+        !this.isTextHidden
+      )
+      this.hide()
+    },
+
+    openCalloutDialog() {
+      if (this.$refs.nodeFeatures) this.$refs.nodeFeatures.openCalloutDialog()
+    },
+
+    removeCallout() {
+      this.$root.$bus.$emit('execCommand', 'REMOVE_CHAT_DIALOG', [this.node])
+      this.hide()
+    },
+
+    openNotationDialog() {
+      if (this.$refs.nodeFeatures) this.$refs.nodeFeatures.openNotationDialog()
+    },
+
+    removeNotation() {
+      this.$root.$bus.$emit('execCommand', 'SET_NOTATION', [this.node], false, {})
+      this.hide()
+    },
+
+    openNodeLinkDialog() {
+      if (this.$refs.nodeFeatures) this.$refs.nodeFeatures.openNodeLinkDialog()
+    },
+
+    jumpToNodeLink() {
+      if (!this.node) return
+      const targetUid = this.node.getData('nodeLink')
+      const renderer = this.mindMap && this.mindMap.renderer
+      const target =
+        renderer && typeof renderer.findNodeByUid === 'function'
+          ? renderer.findNodeByUid(targetUid)
+          : null
+      const targetData =
+        this.mindMap &&
+        this.mindMap.nodeLink &&
+        typeof this.mindMap.nodeLink.findNodeData === 'function'
+          ? this.mindMap.nodeLink.findNodeData(targetUid)
+          : null
+      if (!targetUid || (!target && !targetData)) {
+        this.onNodeLinkNotFind(this.node, targetUid)
+        this.hide()
+        return
+      }
+      this.mindMap.execCommand('GO_TARGET_NODE', targetUid)
+      this.hide()
+    },
+
+    removeNodeLink() {
+      this.$root.$bus.$emit('execCommand', 'SET_NODE_LINK', [this.node], null, false)
       this.hide()
     },
 
@@ -774,6 +1134,8 @@ export default {
 }
 .contextmenuContainer {
   position: absolute;
+  max-height: calc(100vh - 20px);
+  overflow-y: auto;
   font-size: 14px;
   font-family: PingFangSC-Regular, PingFang SC;
   font-weight: 400;
@@ -886,6 +1248,14 @@ export default {
         left: -150px;
       }
     }
+  }
+}
+
+.featureMenu {
+  width: 230px !important;
+
+  &.numberMenu {
+    width: 210px !important;
   }
 }
 </style>

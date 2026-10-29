@@ -60,6 +60,8 @@ function createGeneralizationNode() {
         isGeneralization: true
       })
     }
+    cur.generalizationNode._layout = this.getLayout()
+    cur.generalizationNode._treeContext = this._treeContext
     delete item.inserting
     // 关联所属节点
     cur.generalizationNode.generalizationBelongNode = this
@@ -97,7 +99,7 @@ function renderGeneralization(forceRender) {
     this.removeGeneralization()
   }
   this.createGeneralizationNode()
-  this.renderer.layout.renderGeneralization(this._generalizationList)
+  this.getLayout().renderGeneralization(this._generalizationList)
   this._generalizationList.forEach(item => {
     this.style.generalizationLine(item.generalizationLine)
     item.generalizationNode.render(() => {}, forceRender)

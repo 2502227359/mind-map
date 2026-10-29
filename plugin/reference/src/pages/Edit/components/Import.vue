@@ -73,6 +73,7 @@
       :close-on-click-modal="false"
       :show-close="false"
     >
+      <p>选择主画布，其余画布将保留为游离导图。</p>
       <el-radio-group v-model="selectCanvas" class="canvasList">
         <el-radio
           v-for="(item, index) in canvasList"
@@ -99,6 +100,8 @@ import xmind from 'simple-mind-map/src/parse/xmind.js'
 import markdown from 'simple-mind-map/src/parse/markdown.js'
 import txt from '@/utils/txt'
 import { parseOpml } from 'simple-mind-map/src/parse/opml.js'
+import { parseFreemind } from 'simple-mind-map/src/parse/freemind.js'
+import { importExcel } from '../../../../../src/formats/excel'
 import { mapMutations } from 'vuex'
 import { base64ToFile, tFileToFile } from '@/utils'
 import { getDataFromDt } from '@/components/ImgUpload/utils'
@@ -106,6 +109,7 @@ import { getDataFromDt } from '@/components/ImgUpload/utils'
 const mimeTypes = {
   md: 'text/markdown',
   opml: 'text/xml',
+  mm: 'text/xml',
   json: 'application/json',
   xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 }
@@ -124,7 +128,7 @@ export default {
   },
   computed: {
     supportFileStr() {
-      return '.smm,.json,.xmind,.md,.txt,.opml'
+      return '.smm,.json,.xmind,.md,.txt,.opml,.mm,.xlsx'
     }
   },
   watch: {
@@ -150,7 +154,7 @@ export default {
     },
 
     getRegexp() {
-      return /\.(smm|json|xmind|md|txt|opml)$/i
+      return /\.(smm|json|xmind|md|txt|opml|mm|xlsx)$/i
     },
 
     async onDrop(e) {
@@ -217,6 +221,10 @@ export default {
         this.handleTxt(file)
       } else if (/\.opml$/i.test(file.name)) {
         this.handleOpml(file)
+      } else if (/\.mm$/i.test(file.name)) {
+        this.handleFreemind(file)
+      } else if (/\.xlsx$/i.test(file.name)) {
+        this.handleExcel(file)
       }
       this.cancel()
       this.setActiveSidebar(null)
@@ -225,6 +233,34 @@ export default {
     async handleOpml(file) {
       try {
         const data = parseOpml(await file.raw.text())
+        this.$root.$bus.$emit('setData', data)
+        this.$root.$obsidianAPI.showTip(this.$t('import.importSuccess'))
+      } catch (error) {
+        this.$root.$obsidianAPI.showTip(
+          `${this.$t('import.fileParsingFailed')}：${error.message || error}`
+        )
+      } finally {
+        this.$root.$bus.$emit('hideLoading')
+      }
+    },
+
+    async handleFreemind(file) {
+      try {
+        const data = parseFreemind(await file.raw.text())
+        this.$root.$bus.$emit('setData', data)
+        this.$root.$obsidianAPI.showTip(this.$t('import.importSuccess'))
+      } catch (error) {
+        this.$root.$obsidianAPI.showTip(
+          `${this.$t('import.fileParsingFailed')}：${error.message || error}`
+        )
+      } finally {
+        this.$root.$bus.$emit('hideLoading')
+      }
+    },
+
+    async handleExcel(file) {
+      try {
+        const data = await importExcel(file.raw)
         this.$root.$bus.$emit('setData', data)
         this.$root.$obsidianAPI.showTip(this.$t('import.importSuccess'))
       } catch (error) {
@@ -314,6 +350,10 @@ export default {
 
     handleDataFormula(data) {
       if (!this.transformFormula) return
+      const nodeTree = data && data.root ? data.root : data
+      const roots = nodeTree
+        ? [nodeTree, ...((nodeTree.data && nodeTree.data.freeNodeTrees) || [])]
+        : []
       const walk = node => {
         if (node.data.text && /\$([^\$]+)\$/g.test(node.data.text)) {
           node.data.text = this.convertMathFormula(node.data.text)
@@ -323,7 +363,7 @@ export default {
           node.children.forEach(walk)
         }
       }
-      walk(data)
+      roots.forEach(walk)
     },
 
     async handleMd(file) {
@@ -364,6 +404,10 @@ export default {
       const nodeTree = data.root ? data.root : data
       const waitLoadImageList = []
       const imgMap = nodeTree.data.imgMap || {}
+      const roots = [
+        nodeTree,
+        ...((nodeTree.data && nodeTree.data.freeNodeTrees) || [])
+      ]
       const walk = root => {
         const image = root.data.image
         const imageTitle = root.data.imageTitle || ''
@@ -396,7 +440,7 @@ export default {
           })
         }
       }
-      walk(nodeTree)
+      roots.forEach(walk)
       delete nodeTree.data.imgMap
       if (waitLoadImageList.length > 0) {
         await Promise.all(waitLoadImageList)

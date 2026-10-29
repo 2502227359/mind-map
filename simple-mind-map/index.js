@@ -181,12 +181,12 @@ class MindMap {
   handleData(data) {
     if (isUndef(data) || Object.keys(data).length <= 0) return null
     data = simpleDeepClone(data || {})
-    // 根节点不能收起
-    if (data.data && !data.data.expand) {
-      data.data.expand = true
-    }
+    // 每棵树的根节点都保持展开，折叠状态只属于下级节点。
+    ;[data, ...(data.data?.freeNodeTrees || [])].forEach(root => {
+      root.data.expand = true
+    })
     // 给没有uid的节点添加uid
-    createUidForAppointNodes([data], false, null, true)
+    createUidForAppointNodes([data, ...(data.data?.freeNodeTrees || [])], false, null, true)
     return data
   }
 
@@ -570,6 +570,7 @@ class MindMap {
     addContentToFooter,
     node
   } = {}) {
+    this.emit('before_get_svg_data')
     const { watermarkConfig, openPerformance } = this.opt
     // 如果开启了性能模式，那么需要先渲染所有节点
     if (openPerformance) {
@@ -677,6 +678,7 @@ class MindMap {
     // 恢复原先的大小和变换信息
     svg.size(origWidth, origHeight)
     draw.transform(origTransform)
+    this.emit('after_get_svg_data')
     return {
       svg: clone, // 思维导图图形的整体svg元素，包括：svg（画布容器）、g（实际的思维导图组）
       svgHTML: clone.svg(), // svg字符串
@@ -755,7 +757,13 @@ class MindMap {
 
   // 销毁
   destroy() {
+    this._isDestroyed = true
+    this.renderer.disposed = true
+    clearTimeout(this.renderer.renderTimer)
+    clearTimeout(this.renderer.emitNodeActiveEventTimer)
     this.emit('beforeDestroy')
+    this.renderer.layout.beforeChange?.()
+    ;(this.renderer.freeTreeContexts || []).forEach(context => context.destroy())
     // 清除节点编辑框
     this.renderer.textEdit.hideEditTextBox()
     this.renderer.textEdit.removeTextEditEl()
@@ -802,8 +810,9 @@ color字段不在nodeDataNoStylePropList列表中，所以是样式，内部一�
 */
 let _extendNodeDataNoStylePropList = []
 MindMap.extendNodeDataNoStylePropList = (list = []) => {
-  _extendNodeDataNoStylePropList.push(...list)
-  nodeDataNoStylePropList.push(...list)
+  const extra = list.filter(key => !nodeDataNoStylePropList.includes(key))
+  _extendNodeDataNoStylePropList.push(...extra)
+  nodeDataNoStylePropList.push(...extra)
 }
 MindMap.resetNodeDataNoStylePropList = () => {
   _extendNodeDataNoStylePropList.forEach(item => {

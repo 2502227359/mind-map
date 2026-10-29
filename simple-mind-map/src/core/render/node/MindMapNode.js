@@ -61,8 +61,8 @@ class MindMapNode {
     // top
     this._top = opt.top || 0
     // 自定义位置
-    this.customLeft = opt.data.data.customLeft || undefined
-    this.customTop = opt.data.data.customTop || undefined
+    this.customLeft = opt.data.data.customLeft ?? undefined
+    this.customTop = opt.data.data.customTop ?? undefined
     // 是否正在拖拽中
     this.isDrag = false
     // 父节点
@@ -80,6 +80,7 @@ class MindMapNode {
     this._imgData = null
     this._iconData = null
     this._textData = null
+    this._descData = null
     this._hyperlinkData = null
     this._tagData = null
     this._noteData = null
@@ -171,7 +172,7 @@ class MindMapNode {
 
   // 支持自定义位置
   get left() {
-    return this.customLeft || this._left
+    return this.customLeft ?? this._left
   }
 
   set left(val) {
@@ -179,7 +180,7 @@ class MindMapNode {
   }
 
   get top() {
-    return this.customTop || this._top
+    return this.customTop ?? this._top
   }
 
   set top(val) {
@@ -210,7 +211,7 @@ class MindMapNode {
   }
 
   //  创建节点的各个内容对象数据
-  // recreateTypes：[] custom、image、icon、text、hyperlink、tag、note、attachment、numbers、prefix、postfix、checkbox
+  // recreateTypes：[] custom、image、icon、text、desc、hyperlink、tag、note、attachment、prefix、postfix
   createNodeData(recreateTypes) {
     // 自定义节点内容
     const {
@@ -226,6 +227,7 @@ class MindMapNode {
       'image',
       'icon',
       'text',
+      'desc',
       'hyperlink',
       'tag',
       'note',
@@ -268,6 +270,7 @@ class MindMapNode {
     if (createTypes.image) this._imgData = this.createImgNode()
     if (createTypes.icon) this._iconData = this.createIconNode()
     if (createTypes.text) this._textData = this.createTextNode()
+    if (createTypes.desc) this._descData = this.createDescNode()
     if (createTypes.hyperlink) this._hyperlinkData = this.createHyperlinkNode()
     if (createTypes.tag) this._tagData = this.createTagNode()
     if (createTypes.note) this._noteData = this.createNoteNode()
@@ -319,8 +322,8 @@ class MindMapNode {
     if (!ignoreUpdateCustomTextWidth) {
       this.customTextWidth = this.getData('customTextWidth') || undefined
     }
-    this.customLeft = this.getData('customLeft') || undefined
-    this.customTop = this.getData('customTop') || undefined
+    this.customLeft = this.getData('customLeft') ?? undefined
+    this.customTop = this.getData('customTop') ?? undefined
     // 这里不要更新概要，不然即使概要没修改，每次也会重新渲染
     // this.updateGeneralization()
     this.createNodeData(recreateTypes)
@@ -362,7 +365,7 @@ class MindMapNode {
       }
       // 只读模式不需要阻止冒泡
       if (!readonly) {
-        if (this.isRoot) {
+        if (this === this.renderer.root) {
           // 根节点，右键拖拽画布模式下不需要阻止冒泡
           if (e.which === 3 && !useLeftKeySelectionRightKeyDrag) {
             e.stopPropagation()
@@ -392,7 +395,7 @@ class MindMapNode {
       this.mindMap.emit('node_mousedown', this, e)
     })
     this.group.on('mouseup', e => {
-      if (!this.isRoot && e.which !== 2 && !this.mindMap.opt.readonly) {
+      if (this !== this.renderer.root && e.which !== 2 && !this.mindMap.opt.readonly) {
         e.stopPropagation()
       }
       this.mindMap.emit('node_mouseup', this, e)
@@ -482,6 +485,12 @@ class MindMapNode {
     if (!this.group) {
       return
     }
+    if (
+      this.mindMap.lazyLoadImg &&
+      typeof this.mindMap.lazyLoadImg.loadNodeImg === 'function'
+    ) {
+      this.mindMap.lazyLoadImg.loadNodeImg(this)
+    }
     this.updateNodeActiveClass()
     const {
       alwaysShowExpandBtn,
@@ -534,7 +543,17 @@ class MindMapNode {
     // 更新节点位置
     const t = this.group.transform()
     // 保存一份当前节点数据快照
-    this.nodeDataSnapshot = readonly ? '' : JSON.stringify(this.getData())
+    if (readonly) {
+      this.nodeDataSnapshot = ''
+    } else {
+      const nodeData = this.getData()
+      if (nodeData && nodeData.freeNodeTrees) {
+        const { freeNodeTrees, ...snapshotData } = nodeData
+        this.nodeDataSnapshot = JSON.stringify(snapshotData)
+      } else {
+        this.nodeDataSnapshot = JSON.stringify(nodeData)
+      }
+    }
     // 节点位置变化才更新，因为即使值没有变化属性设置操作也是耗时的
     if (this.left !== t.translateX || this.top !== t.translateY) {
       this.group.translate(this.left - t.translateX, this.top - t.translateY)
@@ -604,6 +623,7 @@ class MindMapNode {
   // forceRender：强制渲染，无论是否处于画布可视区域
   // async：异步渲染
   render(callback = () => {}, forceRender = false, async = false) {
+    if (this.mindMap._isDestroyed) return
     // 节点
     // 重新渲染连线
     this.renderLine()
@@ -706,6 +726,10 @@ class MindMapNode {
     this.removeLine()
     if (this.parent) {
       this.parent.removeLine()
+    }
+    if (this.notationObj && typeof this.notationObj.remove === 'function') {
+      this.notationObj.remove()
+      this.notationObj = null
     }
     if (!this.group) return
     if (this.emptyUser) {
@@ -818,8 +842,9 @@ class MindMapNode {
     }
     let childrenLen = this.getChildrenLength()
     // 切换为鱼骨结构时，清空根节点和二级节点的连线
-    if (this.mindMap.renderer.layout.nodeIsRemoveAllLines) {
-      if (this.mindMap.renderer.layout.nodeIsRemoveAllLines(this)) {
+    const layout = this.getLayout()
+    if (layout && layout.nodeIsRemoveAllLines) {
+      if (layout.nodeIsRemoveAllLines(this)) {
         childrenLen = 0
       }
     }
@@ -836,7 +861,7 @@ class MindMapNode {
       this._lines = this._lines.slice(0, childrenLen)
     }
     // 画线
-    this.renderer.layout.renderLine(
+    layout.renderLine(
       this,
       this._lines,
       (...args) => {
@@ -1073,6 +1098,11 @@ class MindMapNode {
       width: width * scaleX,
       height: height * scaleY
     }
+  }
+
+  // 获取当前节点所属树的布局，独立树场景下优先使用节点上下文布局。
+  getLayout() {
+    return this._layout || (this.renderer && this.renderer.layout)
   }
 
   // 高亮节点

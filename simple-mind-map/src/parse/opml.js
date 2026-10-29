@@ -1,8 +1,6 @@
 import xmlConvert from 'xml-js'
 import { getTextFromHtml } from '../utils/index'
 
-const DEFAULT_ROOT_TEXT = 'OPML'
-
 const isElement = (item, name) => {
   return item && item.type === 'element' && (!name || item.name === name)
 }
@@ -21,20 +19,6 @@ const getCharacterData = item => {
 
 const hasUnexpectedText = item => {
   return getCharacterData(item).trim() !== ''
-}
-
-const getElementText = element => {
-  return (element && element.elements ? element.elements : []).reduce(
-    (text, item) => {
-      const characterData = getCharacterData(item)
-      if (characterData) return text + characterData
-      if (item.type === 'element') {
-        return text + getElementText(item)
-      }
-      return text
-    },
-    ''
-  )
 }
 
 const getAttribute = (attributes, names) => {
@@ -112,6 +96,15 @@ const serializeOutline = (node, depth) => {
   return `${start}>\n${childText}\n${indent}</outline>`
 }
 
+const getFreeNodeTrees = root => {
+  const freeNodeTrees = root && root.data ? root.data.freeNodeTrees : undefined
+  if (freeNodeTrees === undefined || freeNodeTrees === null) return []
+  if (!Array.isArray(freeNodeTrees)) {
+    throw new Error('OPML 自由节点树必须是数组')
+  }
+  return freeNodeTrees
+}
+
 const parseOutline = element => {
   if (!isElement(element, 'outline')) {
     throw new Error('OPML 节点必须是 outline')
@@ -174,18 +167,21 @@ const parseXml = xml => {
   return rootElements[0]
 }
 
-const parseHeadTitle = head => {
-  const title = getElements(head).find(item => item.name === 'title')
-  return title ? getElementText(title).trim() : ''
-}
-
 // 将 SMM 节点树转换为 OPML XML 字符串
 export const transformToOpml = (root, title = '') => {
   if (!root || typeof root !== 'object') {
     throw new Error('OPML 根节点格式错误')
   }
   const headTitle = title === undefined || title === null ? '' : String(title)
-  const outline = serializeOutline(root, 2)
+  const freeNodeTrees = getFreeNodeTrees(root)
+  const rootWithoutFreeTrees = {
+    ...root,
+    data: { ...(root.data || {}) }
+  }
+  delete rootWithoutFreeTrees.data.freeNodeTrees
+  const outlines = [rootWithoutFreeTrees, ...freeNodeTrees].map(tree => {
+    return serializeOutline(tree, 2)
+  })
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<opml version="2.0">',
@@ -193,7 +189,7 @@ export const transformToOpml = (root, title = '') => {
     `    <title>${escapeXml(headTitle)}</title>`,
     '  </head>',
     '  <body>',
-    outline,
+    outlines.join('\n'),
     '  </body>',
     '</opml>',
     ''
@@ -227,11 +223,9 @@ export const parseOpml = xml => {
   const nodes = outlines.map(parseOutline)
   if (nodes.length === 1) return nodes[0]
 
-  const head = heads[0]
-  return {
-    data: { text: parseHeadTitle(head) || DEFAULT_ROOT_TEXT },
-    children: nodes
-  }
+  const root = nodes[0]
+  root.data.freeNodeTrees = nodes.slice(1)
+  return root
 }
 
 export default {

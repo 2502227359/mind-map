@@ -166,6 +166,11 @@ function getNodeRect() {
       this.getImgTextMarin('h', imgContentWidth, textContentWidth)
     _height = Math.max(imgContentHeight, textContentHeight)
   }
+  // 描述位于节点主体下方，不参与正文的横向排列。
+  if (this._descData) {
+    _width = Math.max(_width, this._descData.width)
+    _height += this._descData.height + textContentMargin
+  }
   const { paddingX, paddingY } = this.getPaddingVale()
   // 计算节点形状需要的附加内边距
   const { paddingX: shapePaddingX, paddingY: shapePaddingY } =
@@ -290,6 +295,16 @@ function layout() {
       textContentHeight -= maxTagHeight + textContentMargin
     }
   }
+  const descHeight = this._descData ? this._descData.height : 0
+  const descMargin = descHeight > 0 ? textContentMargin : 0
+  const bodyBottom = height - paddingY - descHeight - descMargin
+  const bodyHeight = Math.max(0, bodyBottom - paddingY)
+  if (this._descData) {
+    this.group.add(this._descData.node)
+    this._descData.node
+      .x((width - this._descData.width) / 2)
+      .y(height - paddingY - descHeight)
+  }
   // 图片节点
   let imgWidth = 0
   let imgHeight = 0
@@ -302,13 +317,15 @@ function layout() {
         this._imgData.node.cx(width / 2).y(paddingY)
         break
       case IMG_PLACEMENT.BOTTOM:
-        this._imgData.node.cx(width / 2).y(height - paddingY - imgHeight)
+        this._imgData.node.cx(width / 2).y(bodyBottom - imgHeight)
         break
       case IMG_PLACEMENT.LEFT:
-        this._imgData.node.x(paddingX).cy(height / 2)
+        this._imgData.node.x(paddingX).cy(paddingY + bodyHeight / 2)
         break
       case IMG_PLACEMENT.RIGHT:
-        this._imgData.node.x(width - paddingX - imgWidth).cy(height / 2)
+        this._imgData.node
+          .x(width - paddingX - imgWidth)
+          .cy(paddingY + bodyHeight / 2)
         break
       default:
         break
@@ -478,11 +495,11 @@ function layout() {
         imgWidth +
         paddingX +
         this.getImgTextMarin('h', imgWidth, textContentWidth)
-      translateY = height / 2 - bboxHeight / 2
+      translateY = paddingY + bodyHeight / 2 - bboxHeight / 2
       break
     case IMG_PLACEMENT.RIGHT:
       translateX = paddingX
-      translateY = height / 2 - bboxHeight / 2
+      translateY = paddingY + bodyHeight / 2 - bboxHeight / 2
       break
   }
   textContentNested.translate(translateX, translateY)

@@ -25,7 +25,7 @@ class OrganizationStructure extends Base {
         callback(this.root)
       }
     ]
-    asyncRun(task)
+    asyncRun(task, undefined, () => !this.mindMap._isDestroyed && !this.renderer.disposed)
   }
 
   //  遍历数据计算节点的left、width、height

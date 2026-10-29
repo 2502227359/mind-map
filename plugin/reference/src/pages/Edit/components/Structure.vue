@@ -15,7 +15,9 @@
             @click="useLayout(item)"
             :class="{ active: item === layout }"
           >
-            <img :src="layoutImgMap[item]" alt="" />
+            <img v-if="layoutImgMap[item]" :src="layoutImgMap[item]" :alt="layoutNames[item] || item" :class="{ mirror: item.startsWith('rightFishbone') }" />
+            <span v-else class="tablePreview">▦</span>
+            <span class="layoutLabel">{{ layoutNames[item] || '' }}</span>
           </div>
         </div>
       </div>
@@ -41,6 +43,7 @@ export default {
   data() {
     return {
       layoutImgMap,
+      layoutNames: { rightFishbone: '右鱼骨', rightFishbone2: '右鱼骨 2', table: '表格' },
       layout: ''
     }
   },
@@ -52,18 +55,23 @@ export default {
 
     layoutGroupList() {
       const groupList = layoutGroupList[this.$i18n.locale] || layoutGroupList.en
-      return groupList.map(group => {
+      const groups = groupList.map(group => {
         return {
           name: group.name,
-          list: [...group.list]
+          list: group.list.includes('fishbone') ? [...group.list, 'rightFishbone', 'rightFishbone2'] : [...group.list]
         }
       })
+      return [...groups, { name: '表格', list: ['table'] }]
     }
   },
   watch: {
     activeSidebar(val) {
       if (val === 'structure') {
-        this.layout = this.mindMap.getLayout()
+        let node = this.mindMap.renderer.activeNodeList[0]
+        while (node?.parent) node = node.parent
+        this.layout = node && node !== this.mindMap.renderer.root
+          ? node.getData('layout') || this.mindMap.getLayout()
+          : this.mindMap.getLayout()
         this.$refs.sidebar.show = true
       } else {
         this.$refs.sidebar.show = false
@@ -72,6 +80,15 @@ export default {
   },
   methods: {
     useLayout(layout) {
+      const selected = this.mindMap.renderer.activeNodeList
+      if (selected.length && selected.some(node => {
+        while (node.parent) node = node.parent
+        return node !== this.mindMap.renderer.root
+      })) {
+        this.mindMap.execCommand('SET_FREE_NODE_TREE_LAYOUT', selected, layout)
+        this.layout = layout
+        return
+      }
       this.layout = layout
       this.mindMap.setLayout(layout)
       this.$root.$bus.$emit('storeData', {
@@ -132,6 +149,10 @@ export default {
           border: 1px solid var(--color-accent);
         }
 
+        position: relative;
+        .layoutLabel { position: absolute; bottom: 2px; left: 5px; font-size: 11px; background: var(--background-primary); }
+        .tablePreview { display: block; font-size: 52px; text-align: center; line-height: 52px; }
+        img.mirror { transform: scaleX(-1); }
         img {
           width: 100%;
           height: 100%;

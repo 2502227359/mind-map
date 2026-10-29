@@ -12,40 +12,49 @@ const getIndentMark = (level, maxLevel) => {
   return new Array(level - maxLevel).fill('   ').join('') + '*'
 }
 
+const getForestRoots = root => {
+  const nodeTree = root && root.root ? root.root : root
+  return nodeTree
+    ? [nodeTree, ...((nodeTree.data && nodeTree.data.freeNodeTrees) || [])]
+    : []
+}
+
 // 转换成markdown格式
 export const transformToMarkdown = (root, maxLevel = 6) => {
   const level = Number(maxLevel)
   maxLevel = Number.isInteger(level) && level >= 1 && level <= 6 ? level : 6
   let content = ''
-  walk(
-    root,
-    null,
-    (node, parent, isRoot, layerIndex) => {
-      const level = layerIndex + 1
-      if (level <= maxLevel) {
-        content += getTitleMark(level)
-      } else {
-        content += getIndentMark(level, maxLevel)
-      }
-      content += ' ' + getNodeText(node.data)
-      // 概要
-      const generalization = node.data.generalization
-      if (Array.isArray(generalization)) {
-        content += generalization.map(item => {
-          return ` [${getNodeText(item)}]`
-        })
-      } else if (generalization && generalization.text) {
-        const generalizationText = getNodeText(generalization)
-        content += ` [${generalizationText}]`
-      }
-      content += '\n\n'
-      // 备注
-      if (node.data.note) {
-        content += node.data.note + '\n\n'
-      }
-    },
-    () => {},
-    true
-  )
+  getForestRoots(root).forEach(nodeTree => {
+    walk(
+      nodeTree,
+      null,
+      (node, parent, isRoot, layerIndex) => {
+        const level = layerIndex + 1
+        if (level <= maxLevel) {
+          content += getTitleMark(level)
+        } else {
+          content += getIndentMark(level, maxLevel)
+        }
+        content += ' ' + getNodeText(node.data)
+        // 概要
+        const generalization = node.data.generalization
+        if (Array.isArray(generalization)) {
+          content += generalization.map(item => {
+            return ` [${getNodeText(item)}]`
+          })
+        } else if (generalization && generalization.text) {
+          const generalizationText = getNodeText(generalization)
+          content += ` [${generalizationText}]`
+        }
+        content += '\n\n'
+        // 备注
+        if (node.data.note) {
+          content += node.data.note + '\n\n'
+        }
+      },
+      () => {},
+      true
+    )
+  })
   return content
 }

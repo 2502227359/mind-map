@@ -47,16 +47,8 @@ const parseXmindFile = (file, handleMultiCanvas) => {
   })
 }
 
-//  转换xmind数据
-const transformXmind = async (content, files, handleMultiCanvas) => {
-  content = JSON.parse(content)
-  let data = null
-  if (content.length > 1 && typeof handleMultiCanvas === 'function') {
-    data = await handleMultiCanvas(content)
-  }
-  if (!data) {
-    data = content[0]
-  }
+// 转换单个xmind画布
+const transformXmindSheet = async (data, files) => {
   const nodeTree = data.rootTopic
   const newTree = {}
   const waitLoadImageList = []
@@ -121,11 +113,29 @@ const transformXmind = async (content, files, handleMultiCanvas) => {
   return newTree
 }
 
-//  转换旧版xmind数据，xmind8
-const transformOldXmind = content => {
-  const data = JSON.parse(content)
-  const elements = data.elements
-  const root = getRoot(elements)
+//  转换xmind数据
+const transformXmind = async (content, files, handleMultiCanvas) => {
+  content = JSON.parse(content)
+  if (!Array.isArray(content) || content.length <= 0) return null
+
+  let selectedSheet = content[0]
+  if (content.length > 1 && typeof handleMultiCanvas === 'function') {
+    // 保留调用方的画布选择契约，未选中的画布作为自由根继续导入
+    selectedSheet = (await handleMultiCanvas(content)) || selectedSheet
+  }
+  const selectedIndex = Math.max(content.indexOf(selectedSheet), 0)
+  const newTree = await transformXmindSheet(selectedSheet, files)
+  const otherSheets = content.filter((item, index) => index !== selectedIndex)
+  if (otherSheets.length > 0) {
+    newTree.data.freeNodeTrees = await Promise.all(
+      otherSheets.map(item => transformXmindSheet(item, files))
+    )
+  }
+  return newTree
+}
+
+// 转换旧版xmind的单个画布，xmind8
+const transformOldXmindTree = root => {
   const newTree = {}
   const walk = (node, newNode) => {
     const nodeElements = node.elements
@@ -219,101 +229,140 @@ const transformOldXmind = content => {
   return newTree
 }
 
+const getOldXmindSheetElements = elements => {
+  const sheets = []
+  const walk = items => {
+    ;(items || []).forEach(item => {
+      if (item.name === 'sheet') {
+        sheets.push(item)
+      } else {
+        walk(item.elements)
+      }
+    })
+  }
+  walk(elements)
+  return sheets
+}
+
+// 转换旧版xmind数据，xmind8
+const transformOldXmind = content => {
+  const data = JSON.parse(content)
+  const elements = data.elements || []
+  const sheets = getOldXmindSheetElements(elements)
+  const roots = (sheets.length > 0
+    ? sheets.map(sheet => getRoot(sheet.elements))
+    : [getRoot(elements)]
+  ).filter(Boolean)
+  const trees = roots.map(transformOldXmindTree)
+  const [newTree, ...freeNodeTrees] = trees
+  if (!newTree) return null
+  if (freeNodeTrees.length > 0) {
+    newTree.data.freeNodeTrees = freeNodeTrees
+  }
+  return newTree
+}
+
 // 数据转换为xmind文件
 // 直接转换为最新版本的xmind文件 2023.09.11172
 const transformToXmind = async (data, name) => {
-  const id = 'simpleMindMap_' + Date.now()
+  const nodeTree = data && data.root ? data.root : data
+  const roots = nodeTree
+    ? [nodeTree, ...((nodeTree.data && nodeTree.data.freeNodeTrees) || [])]
+    : []
   const imageList = []
-  const imageMap = data.data && data.data.imgMap
-  // 转换核心数据
-  let newTree = {}
-  let waitLoadImageList = []
-  let walk = async (node, newNode, isRoot) => {
-    let newData = {
-      id: node.data.uid,
-      structureClass: 'org.xmind.ui.logic.right',
-      title: getTextFromHtml(node.data.text), // 节点文本
-      children: {
-        attached: []
-      }
-    }
-    // 备注
-    if (node.data.note !== undefined) {
-      newData.notes = {
-        realHTML: {
-          content: node.data.note
-        },
-        plain: {
-          content: node.data.note
+  const imageMap = nodeTree && nodeTree.data && nodeTree.data.imgMap
+  const waitLoadImageList = []
+  const sheetList = roots.map((root, index) => {
+    const id = 'simpleMindMap_' + Date.now() + '_' + index
+    const newTree = {}
+    const walk = async (node, newNode, isRoot) => {
+      let newData = {
+        id: node.data.uid,
+        structureClass: 'org.xmind.ui.logic.right',
+        title: getTextFromHtml(node.data.text), // 节点文本
+        children: {
+          attached: []
         }
       }
-    }
-    // 超链接
-    if (node.data.hyperlink !== undefined) {
-      newData.href = node.data.hyperlink
-    }
-    // 标签
-    if (node.data.tag !== undefined) {
-      newData.labels = (node.data.tag || []).map(item => {
-        return typeof item === 'object' && item !== null ? item.text : item
-      })
-    }
-    // 图片
-    handleNodeImageToXmind(
-      node,
-      newNode,
-      waitLoadImageList,
-      imageList,
-      imageMap
-    )
-    // 样式
-    // 暂时不考虑样式
-    if (isRoot) {
-      newData.class = 'topic'
-      newNode.id = id
-      newNode.class = 'sheet'
-      newNode.title = name
-      newNode.extensions = []
-      newNode.topicPositioning = 'fixed'
-      newNode.topicOverlapping = 'overlap'
-      newNode.coreVersion = '2.100.0'
-      newNode.rootTopic = newData
-    } else {
-      Object.keys(newData).forEach(key => {
-        newNode[key] = newData[key]
-      })
-    }
-    // 概要
-    const { summary, summaries } = parseNodeGeneralizationToXmind(node)
-    if (isRoot) {
-      if (summaries.length > 0) {
-        newNode.rootTopic.children.summary = summary
-        newNode.rootTopic.summaries = summaries
+      // 备注
+      if (node.data.note !== undefined) {
+        newData.notes = {
+          realHTML: {
+            content: node.data.note
+          },
+          plain: {
+            content: node.data.note
+          }
+        }
       }
-    } else {
-      if (summaries.length > 0) {
-        newNode.children.summary = summary
-        newNode.summaries = summaries
+      // 超链接
+      if (node.data.hyperlink !== undefined) {
+        newData.href = node.data.hyperlink
+      }
+      // 标签
+      if (node.data.tag !== undefined) {
+        newData.labels = (node.data.tag || []).map(item => {
+          return typeof item === 'object' && item !== null ? item.text : item
+        })
+      }
+      // 图片
+      handleNodeImageToXmind(
+        node,
+        newNode,
+        waitLoadImageList,
+        imageList,
+        imageMap
+      )
+      // 样式
+      // 暂时不考虑样式
+      if (isRoot) {
+        newData.class = 'topic'
+        newNode.id = id
+        newNode.class = 'sheet'
+        newNode.title = index === 0 ? name : `${name} ${index + 1}`
+        newNode.extensions = []
+        newNode.topicPositioning = 'fixed'
+        newNode.topicOverlapping = 'overlap'
+        newNode.coreVersion = '2.100.0'
+        newNode.rootTopic = newData
+      } else {
+        Object.keys(newData).forEach(key => {
+          newNode[key] = newData[key]
+        })
+      }
+      // 概要
+      const { summary, summaries } = parseNodeGeneralizationToXmind(node)
+      if (isRoot) {
+        if (summaries.length > 0) {
+          newNode.rootTopic.children.summary = summary
+          newNode.rootTopic.summaries = summaries
+        }
+      } else {
+        if (summaries.length > 0) {
+          newNode.children.summary = summary
+          newNode.summaries = summaries
+        }
+      }
+      // 子节点
+      if (node.children && node.children.length > 0) {
+        node.children.forEach(child => {
+          let newChild = {}
+          walk(child, newChild)
+          newData.children.attached.push(newChild)
+        })
       }
     }
-    // 子节点
-    if (node.children && node.children.length > 0) {
-      node.children.forEach(child => {
-        let newChild = {}
-        walk(child, newChild)
-        newData.children.attached.push(newChild)
-      })
-    }
-  }
-  walk(data, newTree, true)
+    walk(root, newTree, true)
+    return { id, tree: newTree }
+  })
   await Promise.all(waitLoadImageList)
-  const contentData = [newTree]
+  const contentData = sheetList.map(item => item.tree)
   // 创建压缩包
   const zip = new JSZip()
   zip.file('content.json', JSON.stringify(contentData))
   zip.file(
     'metadata.json',
-    `{"modifier":"","dataStructureVersion":"2","creator":{"name":"mind-map"},"layoutEngineVersion":"3","activeSheetId":"${id}"}`
+    `{"modifier":"","dataStructureVersion":"2","creator":{"name":"mind-map"},"layoutEngineVersion":"3","activeSheetId":"${sheetList[0] ? sheetList[0].id : ''}"}`
   )
   zip.file('content.xml', getXmindContentXmlData())
   const manifestData = {

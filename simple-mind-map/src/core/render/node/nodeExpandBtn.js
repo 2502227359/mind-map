@@ -101,7 +101,7 @@ function updateExpandBtnPos() {
   if (!this._expandBtn) {
     return
   }
-  this.renderer.layout.renderExpandBtn(this, this._expandBtn)
+  this.getLayout().renderExpandBtn(this, this._expandBtn)
 }
 
 //  创建展开收缩按钮

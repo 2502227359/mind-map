@@ -16,6 +16,7 @@ export default {
   // 连线样式
   lineDasharray: 'none',
   // 连线是否开启流动效果，仅在虚线时有效（需要注册LineFlow插件）
+  handDrawnLikeStyle: { enabled: false, roughness: 1.5 },
   lineFlow: false,
   // 流动效果一个周期的时间，单位：s
   lineFlowDuration: 1,

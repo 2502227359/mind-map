@@ -345,7 +345,9 @@ export const imageUrlToBase64 = async url => {
 
 export const checkMindTreeHasImg = tree => {
   let hasImg = false
+  const nodeTree = tree && tree.root ? tree.root : tree
   const walk = root => {
+    if (!root) return
     if (root.data.image) {
       hasImg = true
       return
@@ -356,7 +358,10 @@ export const checkMindTreeHasImg = tree => {
       }
     }
   }
-  walk(tree)
+  const roots = nodeTree
+    ? [nodeTree, ...((nodeTree.data && nodeTree.data.freeNodeTrees) || [])]
+    : []
+  roots.forEach(walk)
   return hasImg
 }
 
@@ -364,28 +369,34 @@ export const parseInnerLinkAndText = (data, $obsidianAPI) => {
   const obLinkMap = {}
   const textData = []
   const { supportObSearch } = $obsidianAPI.getSettings()
-  dfsTraverse(data.root, node => {
-    if (supportObSearch) {
-      textData.push(
-        nodeRichTextToTextWithWrap(node.data.text) + ' ^' + node.data.uid
-      )
-    }
-    const { hyperlink, hyperlinkTitle } = node.data
-    if (
-      hyperlink &&
-      hyperlinkTitle &&
-      !isHyperlink(hyperlink) &&
-      isObLinkText(hyperlinkTitle)
-    ) {
-      obLinkMap[hyperlinkTitle] = true
-    }
-    const matches = matchAll(node.data.text, /<a\s+href="([^"]+)"/g) || []
-    matches.forEach(match => {
-      if (match && match.captured && match.captured[0]) {
-        const res = $obsidianAPI.createLinkInfoFromFilePath(match.captured[0])
-        const linkStr = res ? res.linkText : `[[${match.captured[0]}]]`
-        obLinkMap[linkStr] = true
+  const nodeTree = data && data.root ? data.root : data
+  const roots = nodeTree
+    ? [nodeTree, ...((nodeTree.data && nodeTree.data.freeNodeTrees) || [])]
+    : []
+  roots.forEach(root => {
+    dfsTraverse(root, node => {
+      if (supportObSearch) {
+        textData.push(
+          nodeRichTextToTextWithWrap(node.data.text) + ' ^' + node.data.uid
+        )
       }
+      const { hyperlink, hyperlinkTitle } = node.data
+      if (
+        hyperlink &&
+        hyperlinkTitle &&
+        !isHyperlink(hyperlink) &&
+        isObLinkText(hyperlinkTitle)
+      ) {
+        obLinkMap[hyperlinkTitle] = true
+      }
+      const matches = matchAll(node.data.text, /<a\s+href="([^"]+)"/g) || []
+      matches.forEach(match => {
+        if (match && match.captured && match.captured[0]) {
+          const res = $obsidianAPI.createLinkInfoFromFilePath(match.captured[0])
+          const linkStr = res ? res.linkText : `[[${match.captured[0]}]]`
+          obLinkMap[linkStr] = true
+        }
+      })
     })
   })
   return {

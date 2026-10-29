@@ -39,6 +39,7 @@ function validateNode(node, path) {
   }
   node.children.forEach((child, index) => validateNode(child, `${path}.children[${index}]`))
   if (node.data.freeNodeTrees !== undefined) {
+    if (path !== 'root') throw formatError('游离树只能挂在主根')
     if (!Array.isArray(node.data.freeNodeTrees)) {
       throw formatError(`${path}.data.freeNodeTrees 必须是数组`)
     }

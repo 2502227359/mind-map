@@ -134,7 +134,7 @@ class KeyboardNavigation {
     checkNodeDis
   }) {
     // 遍历节点树
-    bfsWalk(this.mindMap.renderer.root, node => {
+    this.mindMap.renderer.bfsWalkAll( node => {
       // 跳过当前聚焦的节点
       if (node.uid === currentActiveNode.uid) return
       // 当前遍历到的节点的位置信息
@@ -172,7 +172,7 @@ class KeyboardNavigation {
     dir,
     checkNodeDis
   }) {
-    bfsWalk(this.mindMap.renderer.root, node => {
+    this.mindMap.renderer.bfsWalkAll( node => {
       if (node.uid === currentActiveNode.uid) return
       let rect = this.getNodeRect(node)
       let { left, top, right, bottom } = rect
@@ -214,7 +214,7 @@ class KeyboardNavigation {
     // 当前聚焦节点的中心点
     let cX = (currentActiveNodeRect.right + currentActiveNodeRect.left) / 2
     let cY = (currentActiveNodeRect.bottom + currentActiveNodeRect.top) / 2
-    bfsWalk(this.mindMap.renderer.root, node => {
+    this.mindMap.renderer.bfsWalkAll( node => {
       if (node.uid === currentActiveNode.uid) return
       let rect = this.getNodeRect(node)
       let { left, top, right, bottom } = rect

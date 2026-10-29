@@ -10,7 +10,9 @@ export const layoutImgMap = {
   verticalTimeline: require('../assets/img/structures/verticalTimeline.jpg'),
   verticalTimeline2: require('../assets/img/structures/verticalTimeline2.jpg'),
   verticalTimeline3: require('../assets/img/structures/verticalTimeline3.jpg'),
-  fishbone2: require('../assets/img/structures/fishbone2.jpg')
+  fishbone2: require('../assets/img/structures/fishbone2.jpg'),
+  rightFishbone: require('../assets/img/structures/fishbone.jpg'),
+  rightFishbone2: require('../assets/img/structures/fishbone2.jpg')
 }
 
 export const formulaList = [

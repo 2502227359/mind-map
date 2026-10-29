@@ -173,10 +173,10 @@ class Search {
     // 如果要搜索收起来的节点，那么要遍历渲染树而不是节点树
     let roots
     if (isOnlySearchCurrentRenderNodes) {
-      roots = node ? [node] : [this.mindMap.renderer.root]
+      roots = node ? [node] : this.mindMap.renderer.getAllRenderRoot()
     } else {
       const root = node && node.nodeData ? node.nodeData : node
-      roots = root ? [root] : [this.mindMap.renderer.renderTree]
+      roots = root ? [root] : this.mindMap.renderer.getAllRenderTree()
     }
     roots = roots.filter(Boolean)
     if (roots.length <= 0) return

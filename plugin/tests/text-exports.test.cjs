@@ -102,7 +102,7 @@ function installDocumentStub() {
 
 installDocumentStub()
 
-test('Mermaid 导出使用稳定节点 id，并转义结构字符和注释样文本', async () => {
+test('Mermaid flowchart 导出使用稳定节点 id，转义结构字符并保留多根', async () => {
   const { transformToMermaid } = await loadBundled('simple-mind-map/src/parse/toMermaid.js')
   const root = {
     data: { text: '根\n节点 [x] "q" %% comment `tag`' },
@@ -113,15 +113,13 @@ test('Mermaid 导出使用稳定节点 id，并转义结构字符和注释样文
 
   assert.equal(output, transformToMermaid(root))
   assert.equal(output, transformToMermaid({ ...root, data: { text: root.data.text.replace(/\n/g, '\r\n') } }))
-  assert.match(output, /^mindmap\n  n0\["根#10;节点 #91;x#93; &quot;q&quot; #37;#37; comment #96;tag#96;"\]\n    n0_0\["子 #40;节点#41;"\]$/)
+  assert.match(output, /^flowchart TD\n  n0\["根#10;节点 #91;x#93; &quot;q&quot; #37;#37; comment #96;tag#96;"\]\n    n0_0\["子 #40;节点#41;"\]\n  n0 --> n0_0$/)
   assert.doesNotMatch(output, /(^|\n)\s*%%/)
-  assert.throws(
-    () => transformToMermaid({
-      data: { text: '根', freeNodeTrees: [{ data: { text: '自由节点' } }] },
-      children: []
-    }),
-    /Mermaid 导出暂不支持自由节点树，请使用 SMM\/JSON/
-  )
+  const multiRoot = transformToMermaid({
+    data: { text: '根', freeNodeTrees: [{ data: { text: '自由节点' } }] },
+    children: []
+  })
+  assert.match(multiRoot, /\n  n1\["自由节点"\]$/)
 })
 
 test('Mermaid 导出把富文本转换为现有工具产生的可见文字', async () => {
@@ -136,18 +134,53 @@ test('Mermaid 导出把富文本转换为现有工具产生的可见文字', asy
   assert.doesNotMatch(output, /<p>|<\/p>/)
 })
 
-test('HTML 导出只把 SVG data URL 放进安全转义的 img 属性', async () => {
+test('HTML 导出内嵌 SVG、保留链接并移除脚本和事件属性', async () => {
   const { createHtmlDocument } = await loadBundled('simple-mind-map/src/parse/toHtml.js')
   const html = createHtmlDocument(
-    'data:image/svg+xml,<svg attr="x">&</svg>',
+    'data:image/svg+xml,<svg attr="x"><a href="https://example.com">x</a><script>alert(1)</script><rect onclick="alert(1)"/></svg>',
     '标题 <>&"\'\n'
   )
 
   assert.match(html, /<title>标题 &lt;&gt;&amp;&quot;&#39;&#10;<\/title>/)
-  assert.match(html, /src="data:image\/svg\+xml,&lt;svg attr=&quot;x&quot;&gt;&amp;&lt;\/svg&gt;"/)
-  assert.equal((html.match(/<img\b/g) || []).length, 1)
-  assert.doesNotMatch(html, /<script\b|<svg\b|https?:\/\//i)
+  assert.match(html, /<main><svg attr="x">/)
+  assert.match(html, /<a href="https:\/\/example\.com">x<\/a>/)
+  assert.equal((html.match(/<svg\b/g) || []).length, 1)
+  assert.doesNotMatch(html, /<script\b|\bonclick\s*=/i)
+  assert.throws(
+    () => createHtmlDocument('data:image/svg+xml,<svg><a href=javascript:alert(1)>x</a></svg>'),
+    /不安全的 SVG href/
+  )
   assert.throws(() => createHtmlDocument('https://example.com/map.svg'), /SVG data URL/)
   assert.throws(() => createHtmlDocument('javascript:alert(1)'), /SVG data URL/)
   assert.throws(() => createHtmlDocument(undefined), /SVG data URL/)
+})
+
+test('Markdown 和 TXT 导出分别从多根树的零层开始', async () => {
+  const { transformToMarkdown } = await loadBundled(
+    'simple-mind-map/src/parse/toMarkdown.js'
+  )
+  const { transformToTxt } = await loadBundled(
+    'simple-mind-map/src/parse/toTxt.js'
+  )
+  const root = {
+    data: {
+      text: '主根',
+      freeNodeTrees: [
+        {
+          data: { text: '自由根' },
+          children: [{ data: { text: '自由子' }, children: [] }]
+        }
+      ]
+    },
+    children: [{ data: { text: '主子' }, children: [] }]
+  }
+
+  const markdown = transformToMarkdown(root)
+  assert.match(markdown, /# 主根\n\n## 主子/)
+  assert.match(markdown, /# 自由根\n\n## 自由子/)
+  assert.doesNotMatch(markdown, /### 自由根/)
+
+  const txt = transformToTxt(root)
+  assert.match(txt, /^ 主根\n\n    主子/)
+  assert.match(txt, /\n\n 自由根\n\n    自由子/)
 })
