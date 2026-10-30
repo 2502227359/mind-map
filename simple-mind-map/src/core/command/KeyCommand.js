@@ -72,7 +72,7 @@ export default class KeyCommand {
   recoveryCheckInSvg() {
     const { enableShortcutOnlyWhenMouseInSvg } = this.mindMap.opt
     if (!enableShortcutOnlyWhenMouseInSvg) return
-    this.isStopCheckInSvg = true
+    this.isStopCheckInSvg = false
   }
 
   //  绑定事件

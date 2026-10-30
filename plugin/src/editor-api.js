@@ -1,6 +1,7 @@
 import { Notice, Platform, TFile } from 'obsidian'
 import { formatFileName } from '../reference/ob/utils.js'
 import { createHoverLinkPayload } from './link-hover.js'
+import { getMindMapLocalConfig } from './editor-settings.js'
 
 // 独立导图与代码块共用宿主能力，文档的读取、保存由各自生命周期负责。
 export function createEditorApi({ app, plugin, getFile, assetStore, saveFileToVault, documentApi }) {
@@ -24,16 +25,12 @@ export function createEditorApi({ app, plugin, getFile, assetStore, saveFileToVa
         plugin._saveSettings()
       },
       getMindMapLocalConfig: () => {
-        const { mindMapLocalConfig, themeMode } = plugin.settings
-        const config = { ...(mindMapLocalConfig || {}) }
-        config.isDark =
-          themeMode === 'follow'
-            ? plugin._getObIsDark()
-            : themeMode === 'dark'
-        return config
+        return getMindMapLocalConfig(plugin.settings, plugin._getObIsDark())
       },
       saveMindMapLocalConfig: newConfig => {
-        plugin.settings.mindMapLocalConfig = newConfig
+        const localConfig = { ...newConfig }
+        delete localConfig.autoSaveTime
+        plugin.settings.mindMapLocalConfig = localConfig
         plugin._saveSettings()
       },
       getSettings: () => {

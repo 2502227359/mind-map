@@ -316,6 +316,9 @@ export default {
     })
   },
   watch: {
+    autoSaveTime() {
+      if (this.autoSaveTimer !== null) this.autoSave()
+    },
     isShowScrollbar() {
       if (this.isShowScrollbar) {
         this.addScrollbarPlugin()
@@ -862,10 +865,11 @@ export default {
 
     onUpdateMindMapDataFromOb(data, ignoreLayoutAndTheme = false) {
       try {
+        data = JSON.parse(data)
         this.resetModes()
         this.isNotTriggerDataChange = true
-        data = JSON.parse(data)
-        this.mindMap.updateData(data.root)
+        // 外部整图是新的撤销基线，不能混入聚焦期间的子树快照。
+        this.mindMap.setData(data.root)
         if (ignoreLayoutAndTheme) {
           this.updateMindMapData(
             {
@@ -935,16 +939,18 @@ export default {
     autoSave() {
       clearTimeout(this.autoSaveTimer)
       this.autoSaveTimer = setTimeout(() => {
+        this.autoSaveTimer = null
         this.saveToLocal()
       }, this.autoSaveTime * 1000)
     },
 
     clearAutoSave() {
       clearTimeout(this.autoSaveTimer)
+      this.autoSaveTimer = null
     },
 
     manuallySave(...args) {
-      clearTimeout(this.autoSaveTimer)
+      this.clearAutoSave()
       this.saveToLocal(...args)
     },
 

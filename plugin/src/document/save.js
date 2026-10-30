@@ -46,6 +46,17 @@ class SaveCoordinator {
     return this._state
   }
 
+  setDelay(delay) {
+    if (this._disposed) return
+    const next = Math.max(0, Number(delay) || 0)
+    if (next === this._delay) return
+    this._delay = next
+    this._maxWait = next
+    this._clearTimers()
+    this._firstDirtyAt = null
+    if (this._dirty && !this._flushPromise && !['conflict', 'deleted'].includes(this._state)) this._scheduleSave()
+  }
+
   update(nextRaw) {
     if (this._disposed) return
 

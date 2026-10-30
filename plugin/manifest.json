@@ -1,7 +1,7 @@
 {
   "id": "personal-mindmap",
   "name": "个人思维导图",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "minAppVersion": "1.14.4",
   "description": "在 Markdown 文件中编辑和保存思维导图。",
   "author": "个人自用",

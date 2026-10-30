@@ -104,6 +104,11 @@ export default {
       isMobile: state => state.isMobile
     })
   },
+  watch: {
+    autoSaveTime() {
+      if (this.autoSaveTimer !== null) this.autoSave()
+    }
+  },
   mounted() {
     window.addEventListener('keydown', this.onKeyDown)
     this.$root.$bus.$on('getMindMapCurrentData', this.emitMindMapCurrentData)
@@ -118,7 +123,7 @@ export default {
     this.getData()
   },
   beforeDestroy() {
-    clearTimeout(this.autoSaveTimer)
+    this.clearAutoSave()
     window.removeEventListener('keydown', this.onKeyDown)
     this.$root.$bus.$off('getMindMapCurrentData', this.emitMindMapCurrentData)
     this.$root.$bus.$off(
@@ -197,6 +202,8 @@ export default {
         let text2 = textToNodeRichTextWithWrap(text)
         text2 = obUrlToLinkRich(text2)
         node.data.data.text = text2
+      } else {
+        node.data.data.text = text
       }
       node.data.label = text
       node.data.textCache = e.target.innerHTML
@@ -380,16 +387,18 @@ export default {
       this.$root.$bus.$emit('data_change')
       clearTimeout(this.autoSaveTimer)
       this.autoSaveTimer = setTimeout(() => {
+        this.autoSaveTimer = null
         this.saveToLocal()
       }, this.autoSaveTime * 1000)
     },
 
     clearAutoSave() {
       clearTimeout(this.autoSaveTimer)
+      this.autoSaveTimer = null
     },
 
     manuallySave() {
-      clearTimeout(this.autoSaveTimer)
+      this.clearAutoSave()
       this.saveToLocal()
     },
 

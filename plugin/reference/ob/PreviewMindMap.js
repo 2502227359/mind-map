@@ -1,4 +1,6 @@
 import { initPreviewModeApp } from '../src/main'
+import { getMindMapLocalConfig } from '../../src/editor-settings.js'
+import { Notice } from 'obsidian'
 
 export class PreviewMindMap {
   constructor({ plugin, file, onClose }) {
@@ -6,6 +8,8 @@ export class PreviewMindMap {
     this.plugin = plugin
     this.file = file
     this.onClose = onClose
+    this.closed = false
+    this.plugin._markdownOverlays.add(this)
 
     this.previewModeApp = null
     this.container = document.createElement('div')
@@ -13,12 +17,17 @@ export class PreviewMindMap {
     this.container.appendChild(this.wrap)
     this.container.classList.add('smm-preview-md-to-mindmap-container')
     document.body.appendChild(this.container)
-    this._renderView()
+    this._renderView().catch(error => {
+      if (this.closed) return
+      this._close()
+      new Notice(`思维导图预览失败：${error.message}`)
+    })
   }
 
   async _renderView() {
     const content = await this.app.vault.read(this.file)
     const mindMapData = await this.plugin._mdToMindmapData(content)
+    if (this.closed) return
     this.previewModeApp = initPreviewModeApp(this.wrap, {
       getInitMindMapData: () => {
         return mindMapData
@@ -36,24 +45,21 @@ export class PreviewMindMap {
         return this.plugin.settings || {}
       },
       getMindMapLocalConfig: () => {
-        const { mindMapLocalConfig, themeMode } = this.plugin.settings
-        const config = mindMapLocalConfig || {}
-        config.isDark =
-          themeMode === 'follow'
-            ? this.plugin._getObIsDark()
-            : themeMode === 'dark'
-        return config
+        return getMindMapLocalConfig(this.plugin.settings, this.plugin._getObIsDark())
       }
     })
     this.previewModeApp.$bus.$on('closePreviewMode', this._close.bind(this))
   }
 
   _close() {
-    this.previewModeApp.$destroy()
-    document.body.removeChild(this.container)
+    if (this.closed) return
+    this.closed = true
+    this.plugin._markdownOverlays.delete(this)
+    this.previewModeApp?.$destroy()
+    this.container?.remove()
     this.previewModeApp = null
     this.container = null
     this.wrap = null
-    this.onClose()
+    this.onClose?.()
   }
 }

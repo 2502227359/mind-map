@@ -1,5 +1,6 @@
 import { ItemView, Notice } from 'obsidian'
 import { initPreviewModeApp } from '../reference/src/main'
+import { getMindMapLocalConfig } from './editor-settings.js'
 
 export const MARKDOWN_MAP_PREVIEW = 'personal-mindmap-markdown-preview'
 
@@ -72,7 +73,7 @@ export class MarkdownMapPreviewView extends ItemView {
         getIsTabPreview: () => true,
         getMindMapOptions: () => ({ readonly: true, fit: true }),
         getSettings: () => this.plugin.settings,
-        getMindMapLocalConfig: () => ({ ...this.plugin.settings.mindMapLocalConfig, isDark: this.plugin._getObIsDark() }),
+        getMindMapLocalConfig: () => getMindMapLocalConfig(this.plugin.settings, this.plugin._getObIsDark()),
         isActive: () => this.app.workspace.activeLeaf === this.leaf
       })
       this.previewApp.$bus.$on('closePreviewMode', () => this.leaf.detach())

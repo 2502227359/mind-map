@@ -279,7 +279,7 @@ export const shortcutKeyList = [
       {
         icon: 'iconbaocun',
         name: '保存并更新图像数据',
-        value: `${ctrl} + Shfit + S`
+        value: `${ctrl} + Shift + S`
       },
       {
         icon: 'iconxinbiaoqianyedakai',

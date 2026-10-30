@@ -90,6 +90,7 @@ export default class SmmSettingTab extends PluginSettingTab {
             )
             this.plugin.settings.autoSaveTime = value
             await this.plugin._saveSettings()
+            this.plugin._refreshEditorSettings()
           })
       })
 
@@ -181,6 +182,7 @@ export default class SmmSettingTab extends PluginSettingTab {
           .onChange(async value => {
             this.plugin.settings.themeMode = value
             await this.plugin._saveSettings()
+            this.plugin._refreshEditorSettings()
           })
       })
 

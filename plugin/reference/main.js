@@ -45,9 +45,14 @@ import { SuggestionModal } from './ob/SuggestionModal.js'
 import { registerCodeBlocks } from '../src/code-blocks.js'
 import { parseDocument } from '../src/document/format.js'
 import { MarkdownMapPreviewView, MARKDOWN_MAP_PREVIEW } from '../src/markdown-preview-view.js'
+import { getMindMapLocalConfig } from '../src/editor-settings.js'
 
 export default class SimpleMindMapPlugin extends Plugin {
   async onload() {
+    this._markdownOverlays = new Set()
+    this.register(() => {
+      for (const overlay of [...this._markdownOverlays]) overlay._close()
+    })
     await this._addSetting()
 
     await i18n.init({
@@ -66,6 +71,7 @@ export default class SimpleMindMapPlugin extends Plugin {
     this.registerView(SMM_VIEW_TYPE, leaf => new SmmEditView(leaf, this))
     this.registerView(MARKDOWN_MAP_PREVIEW, leaf => new MarkdownMapPreviewView(leaf, this))
     this.registerHoverLinkSource('personal-mindmap', { display: '个人思维导图内链', defaultMod: false })
+    this.registerEvent(this.app.workspace.on('css-change', () => this._refreshEditorSettings()))
 
     this._createSmmFile = this._createSmmFile.bind(this)
     this.addRibbonIcon(
@@ -334,6 +340,28 @@ export default class SimpleMindMapPlugin extends Plugin {
     await this.saveData(this.settings)
     const language = this.settings.lang === 'zhtw' ? 'zh-TW' : this.settings.lang
     if (i18n.language !== language) await i18n.changeLanguage(language)
+  }
+
+  _refreshEditorSettings() {
+    const config = getMindMapLocalConfig(this.settings, this._getObIsDark())
+    const editors = new Set(this._codeBlockEditors || [])
+    for (const overlay of this._markdownOverlays) {
+      if (overlay.previewModeApp) editors.add(overlay.previewModeApp)
+    }
+    for (const type of [SMM_VIEW_TYPE, MARKDOWN_MAP_PREVIEW]) {
+      for (const leaf of this.app.workspace.getLeavesOfType(type)) {
+        const view = leaf.view
+        const editor = view.mindMapAPP || view.previewApp
+        if (editor) editors.add(editor)
+        view.saveCoordinator?.setDelay(config.autoSaveTime * 1000)
+      }
+    }
+    for (const editor of editors) {
+      if (editor._isDestroyed || !editor.$store) continue
+      const current = editor.$store.state.localConfig
+      if (current.isDark === config.isDark && current.autoSaveTime === config.autoSaveTime) continue
+      editor.$store.commit('setLocalConfig', { isDark: config.isDark, autoSaveTime: config.autoSaveTime })
+    }
   }
 
   _registerMonkeyPatches() {

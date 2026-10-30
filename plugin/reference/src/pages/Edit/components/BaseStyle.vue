@@ -1086,7 +1086,7 @@ export default {
         'outerFramePaddingX'
       )
       this.outerFramePadding.outerFramePaddingY = this.mindMap.getConfig(
-        'outerFramePaddingX'
+        'outerFramePaddingY'
       )
     },
 

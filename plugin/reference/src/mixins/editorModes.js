@@ -2,6 +2,7 @@ import { markRaw } from 'vue'
 import { FocusSession } from '../../../src/document/focus.js'
 import { BlankMode } from '../../../src/blank-mode.js'
 import { bindLinkHover } from '../../../src/link-hover.js'
+import { bindEditorShortcuts } from '../../../src/editor-shortcuts.js'
 
 export default {
   data() {
@@ -13,10 +14,12 @@ export default {
     window.addEventListener('keydown', this.onModeEscape)
   },
   beforeDestroy() {
+    this.cancelModeSwitch()
     this.$root.$bus.$off('enter_to_node', this.enterFocus)
     this.$root.$bus.$off('toggle_blank_mode', this.toggleBlankMode)
     window.removeEventListener('keydown', this.onModeEscape)
     this.stopLinkHover?.()
+    this.stopEditorShortcuts?.()
     delete this.$root.$isMapStudyMode
     this.blankMode?.dispose()
     this.focusSession = null
@@ -24,6 +27,7 @@ export default {
   methods: {
     setupModes(mindMap) {
       this.stopLinkHover = bindLinkHover(mindMap.el, this.$root.$obsidianAPI)
+      this.stopEditorShortcuts = bindEditorShortcuts(mindMap, this.$root.$obsidianAPI)
       this.$root.$isMapStudyMode = () => Boolean(this.blankActive || this.focusSession)
     },
 
@@ -72,31 +76,44 @@ export default {
         this.focusHistory = { history: [...m.command.history], index: m.command.activeHistoryIndex }
         this.focusSession = markRaw(new FocusSession(this.currentDocument(), node.uid))
         this.focusLabel = String(node.getData('text') || '节点').replace(/<[^>]*>/g, '')
-        await this.replaceModeDocument(this.focusSession.open())
-        m.view.reset()
+        if (await this.replaceModeDocument(this.focusSession.open())) m.view.reset()
       } catch (error) { this.reportModeError(error) }
     },
 
     async replaceModeDocument(data, seedHistory = true) {
       const m = this.mindMap
+      const version = this.modeVersion = (this.modeVersion || 0) + 1
       this.modeDocument = seedHistory && this.focusSession ? this.focusSession.merge(data) : data
       this.modeSwitching = true
       m.command.addHistory.cancel?.()
       m.command.pause()
+      let completed
       try {
         this.modeReady = new Promise((resolve, reject) => {
-          const done = () => { clearTimeout(timer); m.off('node_tree_render_end', done); resolve() }
-          const timer = setTimeout(() => { m.off('node_tree_render_end', done); reject(new Error('画布未完成渲染')) }, 5000)
+          const clean = () => { clearTimeout(timer); m.off('node_tree_render_end', done) }
+          const done = () => { clean(); resolve(true) }
+          const timer = setTimeout(() => { clean(); reject(new Error('画布未完成渲染')) }, 5000)
+          this.finishModeSwitch = () => { clean(); resolve(false) }
           m.on('node_tree_render_end', done)
           m.setFullData(data)
         })
-        await this.modeReady
+        completed = await this.modeReady
       } finally {
-        m.command.addHistory.cancel?.()
-        m.command.recovery()
-        this.modeSwitching = false
+        if (this.modeVersion === version) this.cancelModeSwitch(false)
       }
+      if (!completed || this.modeVersion !== version) return false
       if (seedHistory) m.command.originAddHistory()
+      return true
+    },
+
+    cancelModeSwitch(invalidate = true) {
+      if (!this.modeSwitching) return
+      if (invalidate) this.modeVersion = (this.modeVersion || 0) + 1
+      this.finishModeSwitch?.()
+      this.finishModeSwitch = null
+      this.mindMap.command.addHistory.cancel?.()
+      this.mindMap.command.recovery()
+      this.modeSwitching = false
     },
 
     async exitFocus() {
@@ -105,7 +122,7 @@ export default {
       if (this.blankActive) this.toggleBlankMode()
       this.closeEditTextBox()
       const full = this.currentDocument()
-      await this.replaceModeDocument(full, false)
+      if (!await this.replaceModeDocument(full, false)) return
       this.focusSession = null
       this.focusLabel = ''
       const command = this.mindMap.command
@@ -116,6 +133,7 @@ export default {
     },
 
     resetModes() {
+      this.cancelModeSwitch()
       if (this.blankActive) this.toggleBlankMode()
       this.focusSession = null
       this.focusLabel = ''

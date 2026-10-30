@@ -13,6 +13,19 @@ const deferred = () => {
   return { promise, resolve, reject }
 }
 
+test('修改自动保存间隔会重新安排尚未写入的快照', async () => {
+  const written = deferred()
+  const coordinator = new SaveCoordinator({ raw: 'old', delay: 10000, write: async () => written.resolve('saved') })
+  coordinator.update('next')
+  try {
+    coordinator.setDelay(5)
+    const result = await Promise.race([written.promise, new Promise(resolve => setTimeout(() => resolve('timeout'), 200))])
+    assert.equal(result, 'saved')
+    await coordinator.flush()
+    assert.equal(coordinator.baseRaw, 'next')
+  } finally { coordinator.dispose() }
+})
+
 test('保存时序：写入期间的更新会继续保存最新快照', async () => {
   const calls = []
   const firstWrite = deferred()
